@@ -1,0 +1,134 @@
+```{r, output=FALSE, warning=FALSE}
+library(dplyr)
+library(Rtsne)
+library(Seurat)
+library(patchwork)
+library(factoextra)
+library(DropletUtils)
+library(scater)
+library(scran)
+library(pheatmap)
+library(jsonlite)
+
+datasetFolder = './data/'
+datasetName = 'PBMC1'
+rawDataDir = paste(datasetFolder, datasetName, '/raw/10X/', sep='')
+filteredDataDir = paste(datasetFolder, datasetName, '/filtered/10X/', sep='')
+outDataDir = paste(datasetFolder, datasetName, '/antibody_annotation/', sep='')
+```
+
+Loading data
+
+```{r}
+exprData = Read10X(data.dir = filteredDataDir, strip.suffix = TRUE)
+antibodyData = Read10X(data.dir = rawDataDir, strip.suffix = TRUE)
+antibodyData = antibodyData[[2]]
+# remove `_TotalSeqB` from column names
+rownames(antibodyData) = gsub("_TotalSeqB", "", rownames(antibodyData))
+```
+
+Display the distribution of the number of detected antobodies (i.e., with non-zero counts):
+
+```{r}
+hist(colSums(antibodyData > 0), col='grey', main="", xlab="Number of detected ADTs")
+```
+
+Visualize the distribution of the total count across all ADTs in a cell:
+
+```{r}
+boxplot(split(log10(colSums(antibodyData)), rownames(antibodyData)), ylab="Log-total ADT count", las=2)
+```
+
+
+Sort matrix rows according to their std (from higher to lower):
+
+```{r}
+std <- apply(antibodyData, 1, sd)
+sortedStd = sort(std, decreasing = TRUE)
+antibodyData <- antibodyData[match(names(sortedStd), rownames(antibodyData)), ]
+rownames(antibodyData)
+```
+
+Create Seurat objects:
+
+```{r}
+absr = CreateSeuratObject(counts = antibodyData, project = 'antibody', min.cells = 0, min.features = 0)
+pbmc = CreateSeuratObject(counts = exprData, project = 'pbmc', min.cells = 0, min.features = 0)
+```
+
+
+Visualizing isotype control antibodies total count distribution
+
+```{r}
+absr[['controlIg']] = PercentageFeatureSet(absr, pattern = '^Ig')
+VlnPlot(absr, features = "controlIg", ncol = 1)
+```
+
+Filtering out cells exhibiting antibody aggregates
+
+```{r}
+absr = subset(absr, subset = controlIg < 1)
+VlnPlot(absr, features = "controlIg", ncol = 1)
+```
+
+Clustering cells on log normalized antibody data
+
+```{r}
+# Intersect cells
+commonCells = intersect(colnames(absr), colnames(pbmc))
+absr = subset(absr, cells = commonCells)
+pbmc = subset(pbmc, cells = commonCells)
+
+# Extract counts for Antibody data and SC-RNA data
+antibodyDataFiltered = t(data.frame(absr@assays[[1]]$counts))
+genesData = t(data.frame(pbmc@assays[[1]]$counts))
+
+# Log normalize antibody data and apply clustering
+absce = as.SingleCellExperiment(absr)
+ablnc = logNormCounts(absce)
+clusters = scran::clusterCells(ablnc, assay.type = "logcounts")
+
+jsonStr = toJSON(c(nclusters=nrow(table(clusters))))
+writeLines(jsonStr, paste(filteredDataDir, 'nclusters.json', sep=''))
+table(clusters)
+```
+
+Visualizing clusters
+
+```{r}
+gdsce = as.SingleCellExperiment(pbmc)
+gdsce <- applySCE(gdsce, logNormCounts)
+gdumap = runUMAP(gdsce)
+colLabels(gdumap) <- factor(clusters)
+plotUMAP(gdumap, colour_by="label", text_by="label")
+```
+
+Displaying in a heatmap the average log-abundance of each antibody
+
+```{r}
+# (for each antibody and cluster, compute the difference between the overall antibody avg and antibody avg in the cluster)
+se.averaged = sumCountsAcrossCells(ablnc, clusters, exprs_values = "logcounts", average = TRUE)
+averaged = assay(se.averaged)
+# label heatmap cols with "cluster_id (cluster_size)"
+plotLabels = c()
+clusters_sizes = table(clusters)
+for (i in 1:nrow(clusters_sizes)) {
+  plotLabels = c(plotLabels, paste(i, ' (', clusters_sizes[[i]], ')', sep=''))
+}
+hmap = pheatmap((averaged - rowMeans(averaged)), kmeans_k = NA, cluster_cols = TRUE, cluster_rows = FALSE, labelsCol=plotLabels, breaks=seq(-3, 3, length.out=100))
+ggsave(paste(outDataDir, "heatmap.png", sep=""), hmap, height = 8)
+```
+
+Saving labels
+
+```{r}
+labels = data.frame("cell" = rownames(genesData), "cluster.ids" = clusters)
+write.csv(labels, paste(outDataDir, "antibody_labels.csv", sep=""), row.names = FALSE)
+uclust = sort(unique(clusters))
+mapping = data.frame("go" = paste("Cluster-", uclust, sep=""), "id" = uclust)
+write.csv(mapping, paste(outDataDir, "antibody_mapping.csv", sep=""), row.names = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
