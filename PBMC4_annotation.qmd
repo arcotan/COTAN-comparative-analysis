@@ -23,11 +23,10 @@ Loading data
 exprData = Read10X(data.dir = filteredDataDir, strip.suffix = TRUE)
 antibodyData = Read10X(data.dir = rawDataDir, strip.suffix = TRUE)
 antibodyData = antibodyData[[2]]
-# remove `_TotalSeqB` from column names
-rownames(antibodyData) = gsub("_TotalSeqB", "", rownames(antibodyData))
+rownames(antibodyData) = gsub("_TotalSeqC", "", rownames(antibodyData))
 ```
 
-Display the distribution of the number of detected antobodies (i.e., with non-zero counts):
+Display the distribution of the number of detected antibodies (i.e., with non-zero counts):
 
 ```{r}
 hist(colSums(antibodyData > 0), col='grey', main="", xlab="Number of detected ADTs")
