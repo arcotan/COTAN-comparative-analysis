@@ -1,0 +1,264 @@
+---
+title: Clustering and differential expression analysis using Monocle
+---
+
+```{r}
+library(monocle3)
+library(rjson)
+source("./utils.R")
+```
+
+Data loading and preparation
+
+```{r}
+numTopMarkers = 500
+minClusterSize = 50
+
+datasetName = 'PBMC1' # modify this
+datasetPath = paste("./data/", datasetName, sep='')
+inDir = paste(datasetPath, '/filtered/10X/', sep='')
+outDir = paste(datasetPath, '/monocle/', sep='')
+outDirDefault = paste(outDir, 'default/', sep='')
+outDirCelltypist = paste(outDir, 'celltypist/', sep='')
+outDirAntibody = paste(outDir, 'antibody/', sep='')
+
+if (!dir.exists(outDirDefault)) {
+  dir.create(outDirDefault, recursive = TRUE)
+}
+if (!dir.exists(outDirCelltypist)) {
+  dir.create(outDirCelltypist, recursive = TRUE)
+}
+if (!dir.exists(outDirAntibody)) {
+  dir.create(outDirAntibody, recursive = TRUE)
+}
+
+numClusterThreshold = 1/10
+numClusterCelltypist = fromJSON(file=paste(datasetPath, '/celltypist/nclusters.json', sep=''))$nclusters
+minNumClusterCelltypist = numClusterCelltypist - numClusterThreshold*numClusterCelltypist
+maxNumClusterCelltypist = numClusterCelltypist - numClusterThreshold+numClusterCelltypist
+numClusterAntibody = fromJSON(file=paste(datasetPath, '/antibody_annotation/nclusters.json', sep=''))$nclusters
+minNumClusterAntibody = numClusterAntibody - numClusterThreshold*numClusterAntibody
+maxNumClusterAntibody = numClusterAntibody - numClusterThreshold+numClusterAntibody
+```
+
+```{r}
+cds <- load_mm_data(
+  mat_path = paste(inDir, "matrix.mtx", sep = "/"), 
+  feature_anno_path = paste(inDir, "genes.tsv", sep = "/"),
+  cell_anno_path = paste(inDir, "barcodes.tsv", sep = "/")
+)
+```
+
+Studying feature variance
+
+```{r}
+cds <- preprocess_cds(cds, num_dim = 10, method = "PCA") # normalization
+plot_pc_variance_explained(cds)
+```
+
+Clustering with default parameters
+
+```{r}
+cds <- cluster_cells(cds, reduction_method = "PCA")
+cat(paste("Number of clusters:", length(levels(clusters(cds, reduction_method = "PCA")))))
+```
+
+Save the default clustering results
+
+```{r}
+defaultLabelsDf = data.frame(clusters(cds, reduction_method = "PCA"))
+defaultLabelsDf$cell <- rownames(defaultLabelsDf)
+rownames(defaultLabelsDf) <- 1:nrow(defaultLabelsDf)
+colnames(defaultLabelsDf)[1] <- "computed_id"
+defaultLabelsDf$computed_id <- as.numeric(defaultLabelsDf$computed_id)
+write_clustering(outDirDefault, defaultLabelsDf, "cell", "computed_id")
+```
+
+
+Differential expression on default clustering results
+
+```{r}
+defaultMarkers <- top_markers(
+  cds,
+  group_cells_by="cluster",
+  genes_to_test_per_group = 3000,
+  reduction_method='PCA',
+  cores=10
+)
+```
+
+Save markers
+
+```{r}
+write_markers(outDirDefault, defaultMarkers, "gene_id", "cell_group", "marker_test_p_value", FALSE, numTopMarkers)
+```
+
+Clustering tuning resolution according to celltypist
+
+```{r}
+cat("Clusters to find:")
+numClusterCelltypist
+```
+
+
+```{r}
+# get ids of clusters bigger than minClusterSize cells
+mapping = read.csv(paste(datasetPath, '/celltypist/celltypist_mapping.csv', sep=''))
+counts = read.csv(paste(datasetPath, '/celltypist/celltypist_annotation_counts.csv', sep=''))
+mappingCounts = merge(mapping, counts, by.x = "go", by.y = "cluster.ids")
+mappingCounts = subset(mappingCounts, count > minClusterSize)
+clustersIdsToKeep = mappingCounts$id
+
+# get barcodes of cells in clusters bigger than minClusterSize cells
+celltypistLabels = read.csv(paste(datasetPath, '/celltypist/celltypist_labels.csv', sep=''))
+celltypistLabels = subset(celltypistLabels, cluster.ids %in% clustersIdsToKeep)
+barcodesToKeep = celltypistLabels$cell
+
+cds <- load_mm_data(
+  mat_path = paste(inDir, "matrix.mtx", sep = ''), 
+  feature_anno_path = paste(inDir, "genes.tsv", sep = ''),
+  cell_anno_path = paste(inDir, "barcodes.tsv", sep = '')
+)
+
+# keep only cells in clusters bigger than minClusterSize cells
+cds = subset(cds, cells = barcodesToKeep)
+```
+
+```{r}
+cds <- preprocess_cds(cds, num_dim = 10, method = "PCA") # normalization
+plot_pc_variance_explained(cds)
+```
+
+```{r}
+maxResolution = 3
+minResolution = 0
+repeat{
+  resolution = (maxResolution + minResolution) / 2
+  cat(paste("Trying resolution ", resolution, '\n', sep=''))
+  cds <- cluster_cells(cds, reduction_method = "PCA", resolution=resolution)
+  numClusters = length(levels(clusters(cds, reduction_method = "PCA")))
+  cat(paste("Got ", numClusters, ' clusters', '\n', sep=''))
+  if (numClusters >= minNumClusterCelltypist & numClusters < maxNumClusterCelltypist){
+    break
+  }
+  else if (numClusters < minNumClusterCelltypist){
+    # increase the resolution
+    minResolution = resolution
+  }
+  else{
+    # reduce the resolution
+    maxResolution = resolution
+  }
+}
+```
+
+
+Save the tuned clustering results
+
+```{r}
+celltypistLabelsDf = data.frame(clusters(cds, reduction_method = "PCA"))
+celltypistLabelsDf$cell <- rownames(celltypistLabelsDf)
+rownames(celltypistLabelsDf) <- 1:nrow(celltypistLabelsDf)
+colnames(celltypistLabelsDf)[1] <- "computed_id"
+celltypistLabelsDf$computed_id <- as.numeric(celltypistLabelsDf$computed_id)
+write_clustering(outDirCelltypist, celltypistLabelsDf, "cell", "computed_id")
+```
+
+Differential expression on tuned clustering results
+
+```{r}
+celltypistMarkers <- top_markers(
+  cds,
+  group_cells_by="cluster",
+  genes_to_test_per_group = 3000,
+  reduction_method='PCA',
+  cores=10
+)
+```
+
+Save markers
+
+```{r}
+write_markers(outDirCelltypist, celltypistMarkers, "gene_id", "cell_group", "marker_test_p_value", FALSE, numTopMarkers)
+```
+
+Clustering tuning resolution according to protein surface
+
+```{r}
+cat(paste("Clusters to find: ", numClusterAntibody))
+```
+
+```{r}
+# get barcodes of cells labelled using protein surface
+antibodyLabels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels.csv', sep=''))
+barcodesToKeep = antibodyLabels$cell
+
+cds <- load_mm_data(
+  mat_path = paste(inDir, "matrix.mtx", sep = "/"), 
+  feature_anno_path = paste(inDir, "genes.tsv", sep = "/"),
+  cell_anno_path = paste(inDir, "barcodes.tsv", sep = "/")
+)
+cds = subset(cds, cells = barcodesToKeep)
+```
+
+```{r}
+cds <- preprocess_cds(cds, num_dim = 10, method = "PCA") # normalization
+plot_pc_variance_explained(cds)
+```
+
+
+```{r}
+maxResolution = 3
+minResolution = 0
+repeat{
+  resolution = (maxResolution + minResolution) / 2
+  cat(paste("Trying resolution ", resolution, '\n', sep=''))
+  cds <- cluster_cells(cds, reduction_method = "PCA", resolution=resolution)
+  numClusters = length(levels(clusters(cds, reduction_method = "PCA")))
+  cat(paste("Got ", numClusters, ' clusters', '\n', sep=''))
+  if (numClusters >= minNumClusterAntibody & numClusters < maxNumClusterAntibody){
+    break
+  }
+  else if (numClusters < minNumClusterAntibody){
+    # increase the resolution
+    minResolution = resolution
+  }
+  else{
+    # reduce the resolution
+    maxResolution = resolution
+  }
+}
+```
+
+Save the tuned clustering results
+
+```{r}
+antibodyLabelsDf = data.frame(clusters(cds, reduction_method = "PCA"))
+antibodyLabelsDf$cell <- rownames(antibodyLabelsDf)
+rownames(antibodyLabelsDf) <- 1:nrow(antibodyLabelsDf)
+colnames(antibodyLabelsDf)[1] <- "computed_id"
+antibodyLabelsDf$computed_id <- as.numeric(antibodyLabelsDf$computed_id)
+write_clustering(outDirAntibody, antibodyLabelsDf, "cell", "computed_id")
+```
+
+Differential expression on tuned clustering results
+
+```{r}
+antibodyMarkers <- top_markers(
+  cds,
+  group_cells_by="cluster",
+  genes_to_test_per_group = 3000,
+  reduction_method='PCA',
+  cores=10
+)
+```
+
+Save markers
+
+```{r}
+write_markers(outDirAntibody, antibodyMarkers, "gene_id", "cell_group", "marker_test_p_value", FALSE, numTopMarkers)
+```
+
+```{r}
+sessionInfo()
+```

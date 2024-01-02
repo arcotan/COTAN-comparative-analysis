@@ -1,0 +1,279 @@
+---
+title: Clustering and differential expression analysis using Seurat
+---
+
+```{r}
+library(dplyr)
+library(rjson)
+library(Seurat)
+library(patchwork)
+library(DropletUtils)
+library(rjson)
+source("./utils.R")
+```
+
+Data loading and preparation
+
+```{r}
+numTopMarkers = 500
+minClusterSize = 50
+
+datasetName = 'PBMC1' # modify this
+datasetPath = paste("./data/", datasetName, sep='')
+inDir = paste(datasetPath, '/filtered/10X/', sep='')
+outDir = paste(datasetPath, '/seurat/', sep='')
+outDirDefault = paste(outDir, 'default/', sep='')
+outDirCelltypist = paste(outDir, 'celltypist/', sep='')
+outDirAntibody = paste(outDir, 'antibody/', sep='')
+
+if (!dir.exists(outDirDefault)) {
+  dir.create(outDirDefault, recursive = TRUE)
+}
+if (!dir.exists(outDirCelltypist)) {
+  dir.create(outDirCelltypist, recursive = TRUE)
+}
+if (!dir.exists(outDirAntibody)) {
+  dir.create(outDirAntibody, recursive = TRUE)
+}
+
+numClusterThreshold = 1/10
+numClusterCelltypist = fromJSON(file=paste(datasetPath, '/celltypist/nclusters.json', sep=''))$nclusters
+minNumClusterCelltypist = numClusterCelltypist - numClusterThreshold*numClusterCelltypist
+maxNumClusterCelltypist = numClusterCelltypist - numClusterThreshold+numClusterCelltypist
+numClusterAntibody = fromJSON(file=paste(datasetPath, '/antibody_annotation/nclusters.json', sep=''))$nclusters
+minNumClusterAntibody = numClusterAntibody - numClusterThreshold*numClusterAntibody
+maxNumClusterAntibody = numClusterAntibody - numClusterThreshold+numClusterAntibody
+```
+
+Dataset loading
+
+```{r}
+pbmc.data <- Read10X(inDir, strip.suffix=TRUE)
+pbmc <- CreateSeuratObject(counts = pbmc.data, min.cells = 0, min.features = 0)
+```
+
+Studying feature variance
+
+```{r}
+plot(log(sort(apply(pbmc.data,1,var), decreasing=TRUE)))
+```
+
+Data normalization
+
+```{r}
+pbmc <- NormalizeData(pbmc, normalization.method = "LogNormalize", scale.factor = 10000)
+```
+
+Feature selection
+
+```{r}
+pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000) # nfeatures chosen based on elbow plot above
+VariableFeaturePlot(pbmc)
+```
+
+Feature scaling
+
+```{r}
+all.genes <- rownames(pbmc)
+pbmc <- ScaleData(pbmc, features = all.genes)
+```
+
+Clustering with default parameters
+
+Plot pca explained variance ratio to choose number of components
+
+```{r}
+pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
+ElbowPlot(object = pbmc, ndims = 50)
+```
+
+Perform the clustering with default parameters
+
+```{r}
+pbmc <- FindNeighbors(pbmc, dims = 1:16) # chosen based on elbow plot above
+pbmc <- FindClusters(pbmc)
+```
+
+Save the default clustering results
+
+```{r}
+defaultLabelsDf = data.frame(Idents(pbmc))
+defaultLabelsDf$cell <- rownames(defaultLabelsDf)
+rownames(defaultLabelsDf) <- 1:nrow(defaultLabelsDf)
+colnames(defaultLabelsDf)[colnames(defaultLabelsDf) == "Idents.pbmc."] <- "computed_id"
+defaultLabelsDf$computed_id <- as.numeric(defaultLabelsDf$computed_id)
+write_clustering(outDirDefault, defaultLabelsDf, "cell", "computed_id")
+```
+
+Differential expression on default clustering results
+
+```{r}
+pbmc.markers <- FindAllMarkers(pbmc)
+```
+
+Save markers
+
+```{r}
+pbmc.markers$cluster <- as.numeric(pbmc.markers$cluster)
+write_markers(outDirDefault, pbmc.markers, "gene", "cluster", "p_val_adj", FALSE, numTopMarkers)
+```
+
+Clustering tuning resolution according to celltypist
+
+```{r}
+cat(paste("Clusters to find:", numClusterCelltypist), sep='')
+```
+
+```{r}
+# get ids of clusters bigger than minClusterSize cells
+mapping = read.csv(paste(datasetPath, '/celltypist/celltypist_mapping.csv', sep=''))
+counts = read.csv(paste(datasetPath, '/celltypist/celltypist_annotation_counts.csv', sep=''))
+mappingCounts = merge(mapping, counts, by.x = "go", by.y = "cluster.ids")
+mappingCounts = subset(mappingCounts, count > minClusterSize)
+clustersIdsToKeep = mappingCounts$id
+
+# get barcodes of cells in clusters bigger than minClusterSize cells
+celltypistLabels = read.csv(paste(datasetPath, '/celltypist/celltypist_labels.csv', sep=''))
+celltypistLabels = subset(celltypistLabels, cluster.ids %in% clustersIdsToKeep)
+barcodesToKeep = celltypistLabels$cell
+barcodesToKeep = substr(barcodesToKeep, 1, nchar(barcodesToKeep) - 2)
+
+# keep only cells in clusters bigger than minClusterSize cells
+pbmcCelltypist = subset(pbmc, cells = barcodesToKeep)
+```
+
+Plot pca explained variance ratio to choose number of components
+
+```{r}
+pbmcCelltypist <- RunPCA(pbmcCelltypist, features = VariableFeatures(object = pbmcCelltypist))
+ElbowPlot(object = pbmcCelltypist, ndims = 50)
+```
+
+Perform the clustering tuning resolution according to celltypist
+
+```{r}
+pbmcCelltypist <- FindNeighbors(pbmcCelltypist, dims = 1:16) # chosen based on elbow plot above
+
+maxResolution = 3
+minResolution = 0
+
+repeat{
+  resolution = (maxResolution + minResolution) / 2
+  cat(paste("Trying resolution ", resolution, sep=''))
+  pbmcCelltypist <- FindClusters(pbmcCelltypist, resolution=resolution)
+  numClusters = nlevels(Idents(pbmcCelltypist))
+  cat(paste("Got ", numClusters, ' clusters', sep=''))
+  if (numClusters >= minNumClusterCelltypist & numClusters < maxNumClusterCelltypist){
+    break
+  }
+  else if (numClusters < minNumClusterCelltypist){
+    # increase the resolution
+    minResolution = resolution
+  }
+  else{
+    # reduce the resolution
+    maxResolution = resolution
+  }
+}
+```
+
+Save the clustering tuned according to celltypist
+
+```{r}
+celltypistLabelsDf = data.frame(Idents(pbmcCelltypist))
+celltypistLabelsDf$cell <- rownames(celltypistLabelsDf)
+rownames(celltypistLabelsDf) <- 1:nrow(celltypistLabelsDf)
+colnames(celltypistLabelsDf)[colnames(celltypistLabelsDf) == "Idents.pbmcCelltypist."] <- "computed_id"
+celltypistLabelsDf$computed_id <- as.numeric(celltypistLabelsDf$computed_id)
+write_clustering(outDirCelltypist, celltypistLabelsDf, "cell", "computed_id")
+```
+
+Differential expression on clustering results tuned according to celltypist
+
+```{r}
+pbmcCelltypist.markers <- FindAllMarkers(pbmcCelltypist)
+```
+
+Save markers
+
+```{r}
+pbmcCelltypist.markers$cluster <- as.numeric(pbmcCelltypist.markers$cluster)
+write_markers(outDirCelltypist, pbmcCelltypist.markers, "gene", "cluster", "p_val_adj", FALSE, numTopMarkers)
+```
+
+Clustering tuning resolution according to celltypist
+
+```{r}
+cat(paste("Clusters to find: ", numClusterAntibody, sep=''))
+```
+
+```{r}
+# get barcodes of cells labelled using protein surface
+antibodyLabels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels.csv', sep=''))
+barcodesToKeep = antibodyLabels$cell
+
+pbmcAntibody = pbmc[, colnames(pbmc) %in% barcodesToKeep]
+```
+
+Plot pca explained variance ratio to choose number of components
+
+```{r}
+pbmcAntibody <- RunPCA(pbmcAntibody, features = VariableFeatures(object = pbmcAntibody))
+ElbowPlot(object = pbmcAntibody, ndims = 50)
+```
+
+Perform the clustering tuning resolution according to protein surface
+
+```{r}
+pbmcAntibody <- FindNeighbors(pbmcAntibody, dims = 1:16) # chosen based on elbow plot above
+
+maxResolution = 3
+minResolution = 0
+
+repeat{
+  resolution = (maxResolution + minResolution) / 2
+  cat(paste("Trying resolution ", resolution, sep=''))
+  pbmcAntibody <- FindClusters(pbmcAntibody, resolution=resolution)
+  numClusters = nlevels(Idents(pbmcAntibody))
+  cat(paste("Got ", numClusters, ' clusters', sep=''))
+  if (numClusters >= minNumClusterAntibody & numClusters < maxNumClusterAntibody){
+    break
+  }
+  else if (numClusters < minNumClusterAntibody){
+    # increase the resolution
+    minResolution = resolution
+  }
+  else{
+    # reduce the resolution
+    maxResolution = resolution
+  }
+}
+```
+
+Save the clustering tuned according to protein surface
+
+```{r}
+antibodyLabelsDf = data.frame(Idents(pbmcAntibody))
+antibodyLabelsDf$cell <- rownames(antibodyLabelsDf)
+rownames(antibodyLabelsDf) <- 1:nrow(antibodyLabelsDf)
+colnames(antibodyLabelsDf)[colnames(antibodyLabelsDf) == "Idents.pbmcAntibody."] <- "computed_id"
+antibodyLabelsDf$computed_id <- as.numeric(antibodyLabelsDf$computed_id)
+write_clustering(outDirAntibody, antibodyLabelsDf, "cell", "computed_id")
+```
+
+Differential expression on clustering results tuned according to protein surface
+
+```{r}
+pbmcAntibody.markers <- FindAllMarkers(pbmcAntibody)
+```
+
+Save markers
+
+```{r}
+pbmcAntibody.markers$cluster <- as.numeric(pbmcAntibody.markers$cluster)
+write_markers(outDirAntibody, pbmcAntibody.markers, "gene", "cluster", "p_val_adj", FALSE, numTopMarkers)
+```
+
+```{r}
+sessionInfo()
+```
