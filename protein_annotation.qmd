@@ -1,0 +1,214 @@
+Annotation with protein abundance
+
+```{r, output=FALSE, warning=FALSE}
+library(dplyr)
+library(Rtsne)
+library(patchwork)
+library(factoextra)
+library(DropletUtils)
+library(scater)
+library(scran)
+library(pheatmap)
+library(pheatmap)
+library(scuttle)
+
+datasetName = 'PBMC1' # modify this
+isotypeControl = '^Ig' # or '^isotype_control'
+datasetFolder = './data/'
+rawDataDir = paste(datasetFolder, datasetName, '/raw/10X/', sep='')
+filteredDataDir = paste(datasetFolder, datasetName, '/filtered/10X/', sep='')
+outDataDir = paste(datasetFolder, datasetName, '/antibody_annotation/', sep='')
+```
+
+Loading data:
+
+```{r}
+rawData <- read10xCounts(rawDataDir)
+sce <- splitAltExps(rawData, rowData(rawData)$Type)
+altExpNames(sce)
+```
+
+
+```{r}
+altExp(sce)
+```
+
+```{r}
+counts(altExp(sce))[,1:10]
+```
+
+Distribution of the log10-total ADT count across cells, stratified by the identity of the most abundant marker in each cell:
+
+```{r}
+adt.counts <- counts(altExp(sce))
+top.marker <- rownames(adt.counts)[max.col(t(adt.counts))]
+total.count <- colSums(adt.counts)
+boxplot(split(log10(total.count), top.marker), ylab="Log-total ADT count", las=2)
+```
+Number of features detected (i.e., with non-zero counts) in each cell:
+
+```{r}
+adt.detected <- colSums(adt.counts > 0)
+hist(adt.detected, col='grey', main="", xlab="Number of detected ADTs")
+```
+
+Identification and marking of cells having most of the ADTs counts to 0:
+
+```{r}
+controls <- grep(isotypeControl, rownames(altExp(sce)))
+qc.stats <- cleanTagCounts(altExp(sce), controls=controls)
+summary(qc.stats$zero.ambient) # libraries removed with no ambient contamination
+```
+
+```{r}
+summary(qc.stats$high.controls)
+```
+
+```{r}
+hist(log10(qc.stats$sum.controls + 1), col='grey', breaks=50,
+    main="", xlab="Log-total count for controls per cell")
+thresholds <- attr(qc.stats$high.controls, "thresholds")
+abline(v=log10(thresholds["higher"]+1), col="red", lty=2)
+```
+Deletion of low quality cells (with high percentage of mithocondrial genes):
+
+```{r}
+mito <- grep("^MT-", rowData(sce)$Symbol)
+df <- perCellQCMetrics(sce, subsets=list(Mito=mito))
+mito.discard <- isOutlier(df$subsets_Mito_percent, type="higher")
+summary(mito.discard)
+```
+
+```{r}
+unfiltered <- sce
+discard <- qc.stats$discard | mito.discard
+sce <- sce[,!discard]
+ncol(sce)
+```
+
+Computation of library size factors:
+
+```{r}
+sf.lib <- librarySizeFactors(altExp(sce))
+summary(sf.lib)
+```
+
+Estimation of the baseline abundance profile from the ADT count matrix by assuming that the distribution of abundances for each ADT should be bimodal:
+
+```{r}
+baseline <- ambientProfileBimodal(altExp(sce))
+head(baseline)
+```
+
+```{r}
+plotExpression(altExp(sce), features=rownames(altExp(sce)), exprs_values="counts") +
+    scale_y_log10() + 
+    geom_point(data=data.frame(x=names(baseline), y=baseline), mapping=aes(x=x, y=y), cex=3)
+```
+Computation of each cell size factors as the median of the ratios of that cell’s counts to the baseline profile:
+
+```{r}
+sf.amb <- medianSizeFactors(altExp(sce), reference=baseline)
+summary(sf.amb)
+```
+
+Factors visualization:
+
+```{r}
+tagdata <- logNormCounts(altExp(sce)) 
+clusters <- clusterCells(tagdata, assay.type="logcounts") 
+
+by.clust <- split(log2(sf.amb/sf.lib), clusters)
+boxplot(by.clust, xlab="Cluster", ylab="Log-ratio (median-based/library size factors)")
+```
+Computation of alternative size factors from the IgG controls:
+
+```{r}
+controls <- grep(isotypeControl, rownames(altExp(sce)))
+sf.control <- librarySizeFactors(altExp(sce), subset_row=controls) 
+summary(sf.control)
+```
+```{r}
+plot(sf.amb, sf.control, log="xy", 
+    xlab="median-based size factors (tag)",
+    ylab="Control size factors (tag)")
+abline(0, 1, col="grey", lty=2)
+```
+
+Setting the size factors for the ADT data:
+
+```{r}
+sizeFactors(altExp(sce)) <- sf.amb
+```
+
+Performing scaling normalization and log-transformation for both the endogenous transcripts and the ADTs using their respective size factors:
+
+```{r}
+sce <- applySCE(sce, logNormCounts)
+
+# Checking that we have normalized values:
+assayNames(sce)
+```
+```{r}
+assayNames(altExp(sce))
+```
+
+Performing the clustering and visualizing cells in a t-SNE plot:
+
+```{r}
+clusters.adt <- clusterCells(altExp(sce), assay.type="logcounts")
+set.seed(1010010)
+altExp(sce) <- runTSNE(altExp(sce))
+colLabels(altExp(sce)) <- factor(clusters.adt)
+plotTSNE(altExp(sce), colour_by="label", text_by="label", text_color="red")
+```
+
+Sorting antibodies according to their std (from higher to lower):
+
+```{r}
+sceCounts = counts(altExp(sce))
+std <- apply(sceCounts, 1, sd)
+sortedStd = sort(std, decreasing = TRUE)
+names(sortedStd)
+```
+Creation of a heatmap of the average log-abundance of each tag:
+
+```{r}
+se.averaged <- sumCountsAcrossCells(altExp(sce), clusters.adt,
+    exprs_values="logcounts", average=TRUE)
+averaged <- assay(se.averaged)
+heatmap_data <- averaged - rowMeans(averaged)
+
+# sort rows according to std
+heatmap_data <- heatmap_data[match(names(sortedStd), rownames(heatmap_data)),]
+
+# label heatmap cols with "cluster_id (cluster_size)"
+plotLabels = c()
+clusters_sizes = table(clusters.adt)
+for (i in 1:nrow(clusters_sizes)) {
+  plotLabels = c(plotLabels, paste(i, ' (', clusters_sizes[[i]], ')', sep=''))
+}
+
+hmap = pheatmap(
+  heatmap_data,
+  breaks = seq(-3, 3, length.out = 101),
+  labels_col = plotLabels,
+  cluster_rows = FALSE  # Prevent additional row clustering
+)
+ggsave(paste(outDataDir, "heatmap.png", sep=""), hmap, height = 8)
+```
+Saving labels:
+
+```{r}
+cellsBarcodes = colData(sce)[,2]
+cellsBarcodes <- substr(cellsBarcodes, 1, nchar(cellsBarcodes) - 2)
+labels = data.frame("cell" = cellsBarcodes, "cluster.ids" = clusters)
+write.csv(labels, paste(outDataDir, "antibody_labels.csv", sep=""), row.names = FALSE)
+uclust = sort(unique(clusters))
+mapping = data.frame("go" = paste("Cluster-", uclust, sep=""), "id" = uclust)
+write.csv(mapping, paste(outDataDir, "antibody_mapping.csv", sep=""), row.names = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
