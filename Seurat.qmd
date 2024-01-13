@@ -16,7 +16,7 @@ Data loading and preparation
 
 ```{r}
 numTopMarkers = 500
-minClusterSize = 50
+minClusterSize = 0
 
 datasetName = 'PBMC1' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
@@ -201,7 +201,7 @@ pbmcCelltypist.markers$cluster <- as.numeric(pbmcCelltypist.markers$cluster)
 write_markers(outDirCelltypist, pbmcCelltypist.markers, "gene", "cluster", "p_val_adj", FALSE, numTopMarkers)
 ```
 
-Clustering tuning resolution according to celltypist
+Clustering tuning resolution according to protein surface
 
 ```{r}
 cat(paste("Clusters to find: ", numClusterAntibody, sep=''))

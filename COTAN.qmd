@@ -10,13 +10,13 @@ library(tibble)
 library(ggplot2)
 library(zeallot)
 library(rjson)
-source(".utils.R")
+source("./utils.R")
 options(parallelly.fork.enable = TRUE)
 
 numCores = 8
 defaultGDIThreshold = 1.4
 numTopMarkers = 500
-minClusterSize = 50
+minClusterSize = 0
 
 datasetName = 'PBMC1' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
