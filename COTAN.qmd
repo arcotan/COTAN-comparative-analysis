@@ -50,12 +50,8 @@ setLoggingFile(file.path(outDir, paste(datasetName, ".log", sep='')))
 
 Data loading
 
-```{r, echo=TRUE, eval=FALSE}
+```{r}
 PBMC <- readRDS(file = file.path(inDir, paste0(datasetName, ".cotan.RDS")))
-```
-
-```{r, echo=FALSE, eval=TRUE}
-PBMC <- readRDS(file = file.path(outDir, paste0(datasetName, ".cotan.RDS")))
 ```
 
 Calculate genes’ COEX
@@ -213,6 +209,7 @@ clusterIdsToKeep = mappingCounts$id
 celltypistLabels = read.csv(paste(datasetPath, '/celltypist/celltypist_labels.csv', sep=''))
 celltypistLabels = subset(celltypistLabels, cluster.ids %in% clusterIdsToKeep)
 barcodesToKeep = celltypistLabels$cell
+barcodesToKeep = substring(barcodesToKeep, 1, nchar(barcodesToKeep) - 2)
 
 # keep only cells in clusters bigger than minClusterSize cells
 barcodesToDrop = getCells(PBMC)[!getCells(PBMC) %in% barcodesToKeep]
@@ -297,6 +294,8 @@ Merge clusters according to protein surface
 # get barcodes of cells labelled using antibody data
 antibodyLabels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels.csv', sep=''))
 barcodesToKeep = antibodyLabels$cell
+
+# barcodesToKeep = substring(barcodesToKeep, 1, nchar(barcodesToKeep) - 2) # TODO: ?
 
 # keep only cells labelled with antibody data
 barcodesToDrop = getCells(PBMC)[!getCells(PBMC) %in% barcodesToKeep]
