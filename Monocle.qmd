@@ -113,6 +113,7 @@ clustersIdsToKeep = mappingCounts$id
 celltypistLabels = read.csv(paste(datasetPath, '/celltypist/celltypist_labels.csv', sep=''))
 celltypistLabels = subset(celltypistLabels, cluster.ids %in% clustersIdsToKeep)
 barcodesToKeep = celltypistLabels$cell
+barcodesToKeep = substring(barcodesToKeep, 1, nchar(barcodesToKeep) - 2)
 
 cds <- load_mm_data(
   mat_path = paste(inDir, "matrix.mtx", sep = ''), 
