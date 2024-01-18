@@ -9,6 +9,7 @@ def sankey_plot(
         labels_titles,
         path,
         title,
+        colored_links=False,
         link_opacity=0.4,
     ):
     '''
@@ -63,13 +64,13 @@ def sankey_plot(
                     thickness = 20,
                     line = dict(color = "black", width = 0.5),
                     label = plot_labels,
-                    color = node_palette.to_hex()
+                    color = node_palette.as_hex()
                 ),
                 link = dict(
                     source = source,
                     target = target,
                     value = value,
-                    color = [link_palette[i] for i in source]
+                    color = [link_palette[i] for i in source] if colored_links else None
                 )
             )
         ]
