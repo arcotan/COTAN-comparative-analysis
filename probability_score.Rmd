@@ -1,0 +1,325 @@
+
+---
+  title: "Compare the various clusterizations of Forebrain Dorsal E15.0"
+---
+
+```{r}
+library(rlang)
+library(testthat)
+library(ggplot2)
+library(tibble)
+library(zeallot)
+library(Seurat)
+library(aricode)
+library(funtimes)
+library(monocle3)
+library(cluster)
+library(COTAN)
+
+options(parallelly.fork.enable = TRUE)
+
+# modify these
+logFile = 'logfile.log'
+COTANObjPath = './data/PBMC1/COTAN/default/PBMC1.cotan.RDS'
+celltypistPath = './data/PBMC1/celltypist/Immune_All_Low_probability_matrix.csv'
+outScoresPath = './data/PBMC1/prob_scores.csv'
+  
+setLoggingLevel(2)
+setLoggingFile(file.path(".", logFile))
+```
+
+This function creates a sankey plot, given a COTAN object and the names
+of 2 (or 3) clusterizations stored in the cells' metadata
+
+```{r}
+createSankey <- function(objCOTAN, clName1, clName2, clName3 = NULL,
+                         space = 2, size = 4, color_option = "H") {
+  useThirdCluster <- !is.null(clName3)
+
+  cl1 <- getClusters(objCOTAN, clName = clName1)
+  if (!is.character(levels(cl1))) {
+    cl1 <- niceFactorLevels(cl1)
+  }
+
+  cl2 <- getClusters(objCOTAN, clName = clName2)
+  if (!is.character(levels(cl2))) {
+    cl2 <- niceFactorLevels(cl2)
+  }
+
+  cl3 <- NULL
+  if (useThirdCluster) {
+    cl3 <- getClusters(objCOTAN, clName = clName3)
+    if (!is.character(levels(cl3))) {
+      cl3 <- niceFactorLevels(cl3)
+    }
+  }
+
+  logThis(paste("Clusterization: ", clName1))
+  logThis(paste("Number of clusters: ",
+                nlevels(as.factor(cl1))), logLevel = 1L)
+  logThis(paste("Top 10 clusters: ",
+                paste0(head(sort(table(cl1), decreasing = TRUE), 10L),
+                         collapse = ", ")), logLevel = 1L)
+
+  logThis(paste("Clusterization: ", clName2))
+  logThis(paste("Number of clusters: ",
+                nlevels(as.factor(cl2))), logLevel = 1L)
+  logThis(paste("Top 10 clusters: ",
+                paste0(head(sort(table(cl2), decreasing = TRUE), 10L),
+                         collapse = ", ")), logLevel = 1L)
+
+  if (useThirdCluster) {
+    logThis(paste("Clusterization: ", clName3))
+    logThis(paste("Number of clusters: ",
+                  nlevels(as.factor(cl3))), logLevel = 1L)
+    logThis(paste("Top 10 clusters: ",
+                  paste0(head(sort(table(cl3), decreasing = TRUE), 10L),
+                           collapse = ", ")), logLevel = 1L)
+  }
+
+  df <- data.frame(cbind(factorToVector(cl1), factorToVector(cl2)))
+  colnames(df) <- paste0(c(clName1, clName2), ".clusters")
+  if (useThirdCluster) {
+    df <- cbind(df, factorToVector(cl3))
+    colnames(df)[[3]] <- paste0(clName3, ".clusters")
+  }
+
+  crossTable <- list(table(df[, c(1,2)]))
+  if (useThirdCluster) {
+    crossTable <- append(crossTable, list(table(df[, c(1,3)]), table(df[, c(2,3)])))
+  }
+
+  table2 <- df %>% make_long(1:ncol(df))
+
+  sankeyPlot <-
+    ggplot(table2,
+           aes(x = x,
+               next_x = next_x,
+               node = node,
+               next_node = next_node,
+               fill = factor(node),
+               label = node)) +
+    geom_alluvial(flow.alpha = 0.75, node.color = 0, space = space) +
+    geom_alluvial_text(space = space) +
+#    geom_alluvial_label(space = space) +
+    scale_fill_viridis_d(option = color_option, alpha = 0.95, begin = 0.2, end = 0.9) +
+    theme_alluvial(base_size = 16, base_line_size = size) +
+    theme(legend.position = "none")
+#    theme(plot.margin = unit(c(0,0,0,0), "mm"))
+#    theme(legend.box.spacing = unit(0, "mm"))
+#    labs(title = "Alluvial diagram using ggplot")
+#    labs(subtitle = "using  David Sjoberg's ggsankey package")
+#    labs(caption = "@techanswers88")
+
+  return(list("tables" = crossTable, "plot" = sankeyPlot))
+}
+```
+
+Loading the COTAN object
+
+```{r}
+COTANObj <- readRDS(file = COTANObjPath)
+
+sampleCondition <- getMetadataElement(COTANObj, datasetTags()[["cond"]])
+
+logThis(sampleCondition)
+
+allClust <- getClusterizations(COTANObj)
+
+logThis("")
+logThis(paste("Number of cells:", getNumCells(COTANObj)))
+
+logThis("")
+logThis("Available clusterizations:")
+logThis(paste0(allClust, collapse = ", "))
+
+clSizes <- vapply(allClust, function(x) { nlevels(getClusters(COTANObj, x))}, integer(1L))
+clSizes
+logThis(paste(names(clSizes), clSizes, sep = ": ", collapse = ", "))
+```
+
+Load CellTypist clusterization
+
+```{r}
+probMatrixDF <- read.csv(celltypistPath, header = TRUE)
+probMatrixDF <- column_to_rownames(probMatrixDF, var = "X")
+rownames(probMatrixDF) <- gsub("[.]", ":", rownames(probMatrixDF))
+rownames(probMatrixDF) <- gsub("X10X", "10X", rownames(probMatrixDF))
+rownames(probMatrixDF) <- substr(rownames(probMatrixDF), 1, nchar(rownames(probMatrixDF)) - 2) # to delete with e175
+
+cells_to_keep <- rownames(probMatrixDF)[rownames(probMatrixDF) %in% getCells(COTANObj)]
+#assert_that(identical(cells_to_keep, getCells(COTANObj)))
+```
+
+Estimate number of dimensions
+
+```{r}
+prc <- PCAtools::pca(mat = probMatrixDF, rank = 50, transposed = TRUE)
+100 - sum(prc[["variance"]])
+
+plot(prc$sdev)
+
+nDims <- 20
+plot(prc[["sdev"]][10:nDims])
+
+pca <- PCAtools::pca(mat = probMatrixDF, rank = nDims, transposed = TRUE)
+
+logThis(paste("Residual variance percentage: ", 100 - sum(pca[["variance"]])),
+        logLevel = 2L)
+
+normMatrix <- scale(x = pca[["rotated"]], center = TRUE, scale = TRUE)
+rownames(normMatrix) <- rownames(probMatrixDF)
+```
+
+Calculate the projection to spherical distribution [Malahanobis distance]:
+the sum of square distances from center of sub-cluster in pca-projected space
+
+```{r}
+averageClustersDistance <- function(probMatrixDF,
+                                    clusterization, numDim = 20L) {
+  pca <- PCAtools::pca(mat = probMatrixDF, rank = nDims, transposed = TRUE)
+
+  logThis(paste("Residual variance percentage: ", 100 - sum(pca[["variance"]])),
+          logLevel = 2L)
+
+  normMatrix <- scale(x = pca[["rotated"]], center = TRUE, scale = TRUE)
+  rownames(normMatrix) <- rownames(probMatrixDF)
+
+  logThis(paste("Final dimensions:", paste0(dim(normMatrix), collapse = ", ")),
+          logLevel = 2L)
+
+  squareDist <- function(subMatrix) {
+    subMatrix <- scale(subMatrix, scale = FALSE, center = TRUE)
+    return(sum(rowSums(subMatrix^2)))
+  }
+
+  clustersList <- toClustersList(clusterization)
+  sumDist <- 0.0
+  for (cl in clustersList) {
+    sumDist <- sumDist + squareDist(normMatrix[cl, , drop = FALSE]) # could not find function "squareDistanceFromCellTypist"
+  }
+  return(sumDist / ncol(normMatrix) / (nrow(normMatrix) - length(clustersList)))
+}
+```
+
+Check above score is not dependent on clusters numerosity and size
+```{r}
+set.seed(155)
+shuffledCells <- sample(getCells(COTANObj))
+
+rndDist <- function(n) {
+  clusters <- set_names(rep(1:n, ceiling(9000/n))[1:getNumCells(COTANObj)], shuffledCells)
+  d <- averageClustersDistance(probMatrixDF, clusters)
+  return(d)
+}
+
+sizes <- c(1:15, seq(20, 50, by = 5), seq(60, 100, by = 10),
+           seq(150, 1000, by = 50), seq(1500, 9000, by = 500))
+
+sizesToDists <- vapply(sizes, rndDist, numeric(1)) 
+names(sizesToDists) <- sizes
+
+sizesToDists
+
+plot(names(sizesToDists), sizesToDists)
+```
+
+
+
+```{r}
+avgDists <- vapply(allClust, function(clName) {
+  averageClustersDistance(normMatrix, getClusters(COTANObj, clName))
+}, numeric(1))
+
+avgDists
+```
+
+
+
+```{r}
+tableAndPlot <- createSankey(COTANObj, "original.subclass", "merge", "seurat",
+                             space = 14, size = 2, color_option = "G")
+
+tableAndPlot
+```
+
+```{r}
+normDists <- dist(normMatrix)
+
+silhs <- vapply(allClust, function(clName) {
+  clusters <- getClusters(COTANObj, clName)
+  if (nlevels(clusters) < 2L) {
+    return(-1)
+  } else {
+    sil <- silhouette(as.integer(clusters), dist = normDists)
+    return(mean(sil[, "sil_width"]))
+  }
+}, numeric(1))
+
+silhs
+```
+
+
+```{r}
+allMutualScores <- function(objCOTAN, clName) {
+  cbind(
+    "NMI" = vapply(allClust, function(clName2) {
+        NMI(getClusters(objCOTAN, clName = clName),
+            getClusters(objCOTAN, clName = clName2),
+            variant = "sum")
+      }, numeric(1)),
+  
+    "AMI" = vapply(allClust, function(clName2) {
+        AMI(getClusters(objCOTAN, clName = clName),
+            getClusters(objCOTAN, clName = clName2))
+      }, numeric(1)),
+
+    "ARI" = vapply(allClust, function(clName2) {
+        ARI(getClusters(objCOTAN, clName = clName),
+            getClusters(objCOTAN, clName = clName2))
+      }, numeric(1)),
+
+    "purity" = vapply(allClust, function(clName2) {
+        purity(getClusters(objCOTAN, clName = clName),
+               getClusters(objCOTAN, clName = clName2))[["pur"]]
+      }, numeric(1))
+  )
+}
+```
+
+
+```{r}
+cellTypistScores <- allMutualScores(COTANObj, clName = "cell.typist")
+
+cellTypistScores
+```
+
+```{r}
+originalSubclassScores <- allMutualScores(COTANObj, clName = "original.subclass")
+
+originalSubclassScores
+```
+
+
+```{r}
+originalClusterScores <- allMutualScores(COTANObj, clName = "original.clusters")
+
+originalClusterScores
+```
+
+
+
+```{r}
+comparativeScores <- cbind(clSizes, avgDists, silhs,
+                           originalClusterScores[, "AMI"], originalClusterScores[ , "ARI"],
+                           cellTypistScores[ , "AMI"], cellTypistScores[ , "ARI"])
+
+colnames(comparativeScores) <- c("NumClusters", "NPD", "Silhouette",
+                                 "AMI_OriginalClusters", "ARI_OriginalClusters",
+                                 "AMI_CellTypist", "ARI_CellTypist")
+
+comparativeScores
+
+write.csv(comparativeScores, outScoresPath)
+```
+
