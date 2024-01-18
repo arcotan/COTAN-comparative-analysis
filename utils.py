@@ -2,12 +2,14 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.offline as pyo
+import seaborn as sns
 
 def sankey_plot(
         labels,
         labels_titles,
         path,
-        title
+        title,
+        link_opacity=0.4,
     ):
     '''
     This function plots a Sankey diagram of the sets of labels passed as arguments.
@@ -23,6 +25,10 @@ def sankey_plot(
     plot_labels = []
     for i in range(len(labels)):
         plot_labels += np.unique(labels[i]).tolist()
+
+    # Generate color palette for sankey nodes
+    node_palette = sns.color_palette(None, len(plot_labels))
+    link_palette = [f'rgba({int(r*255)}, {int(g*255)}, {int(b*255)}, {link_opacity})' for r, g, b in node_palette]
 
     source = []
     target = []
@@ -56,12 +62,14 @@ def sankey_plot(
                     pad = 15,
                     thickness = 20,
                     line = dict(color = "black", width = 0.5),
-                    label = plot_labels
+                    label = plot_labels,
+                    color = node_palette.to_hex()
                 ),
                 link = dict(
                     source = source,
                     target = target,
-                    value = value
+                    value = value,
+                    color = [link_palette[i] for i in source]
                 )
             )
         ]
