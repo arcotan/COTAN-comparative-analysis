@@ -173,6 +173,7 @@ names(sortedStd)
 ```
 Creation of a heatmap of the average log-abundance of each tag:
 
+
 ```{r}
 se.averaged <- sumCountsAcrossCells(altExp(sce), clusters.adt,
     exprs_values="logcounts", average=TRUE)
@@ -202,9 +203,9 @@ Saving labels:
 ```{r}
 cellsBarcodes = colData(sce)[,2]
 cellsBarcodes <- substr(cellsBarcodes, 1, nchar(cellsBarcodes) - 2)
-labels = data.frame("cell" = cellsBarcodes, "cluster.ids" = clusters)
+labels = data.frame("cell" = cellsBarcodes, "cluster.ids" = clusters.adt)
 write.csv(labels, paste(outDataDir, "antibody_labels.csv", sep=""), row.names = FALSE)
-uclust = sort(unique(clusters))
+uclust = sort(unique(clusters.adt))
 mapping = data.frame("go" = paste("Cluster-", uclust, sep=""), "id" = uclust)
 write.csv(mapping, paste(outDataDir, "antibody_mapping.csv", sep=""), row.names = FALSE)
 ```
