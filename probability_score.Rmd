@@ -16,8 +16,11 @@ library(monocle3)
 library(cluster)
 library(COTAN)
 
-labelsPath = './data/PBMC1/monocle/default/clustering_labels.csv'
-celltypistPath = './data/PBMC1/celltypist/Immune_All_Low_probability_matrix.csv'
+tunings = c('default')#, 'antibody', 'celltypist')
+tools = c('monocle')#, 'scanpy', 'seurat', 'scvi-tools', 'COTAN')
+dataset = 'PBMC1'
+celltypistPath = paste('./data/', dataset, '/celltypist/Immune_All_Low_probability_matrix.csv', sep='')
+outPath = paste('./data/', dataset, '/probabilistic_score.csv', sep='')
 ```
 
 Load CellTypist clusterization
@@ -49,12 +52,12 @@ averageClustersDistance <- function(probMatrixDF,
                                     clustersList, numDim = 20L) {
   pca <- PCAtools::pca(mat = probMatrixDF, rank = nDims, transposed = TRUE)
 
-  print(paste("Residual variance percentage: ", 100 - sum(pca[["variance"]])))
+  residual_variance = 100 - sum(pca[["variance"]])
 
   normMatrix <- scale(x = pca[["rotated"]], center = TRUE, scale = TRUE)
   rownames(normMatrix) <- rownames(probMatrixDF)
 
-  print(paste("Final dimensions:", paste0(dim(normMatrix), collapse = ", ")))
+  final_dimensions = dim(normMatrix)[2]
 
   squareDist <- function(subMatrix) {
     subMatrix <- scale(subMatrix, scale = FALSE, center = TRUE)
@@ -64,13 +67,28 @@ averageClustersDistance <- function(probMatrixDF,
   for (cl in clustersList) {
     sumDist <- sumDist + squareDist(normMatrix[cl, , drop = FALSE])
   }
-  return(sumDist / ncol(normMatrix) / (nrow(normMatrix) - length(clustersList)))
+  score = sumDist / ncol(normMatrix) / (nrow(normMatrix) - length(clustersList))
+  return(list("residual_variance" = residual_variance, "final_dimensions" = final_dimensions, "score" = score))
 }
 ```
 
 ```{r}
-labels <- read.csv(labelsPath, header = TRUE)
-clustersList<- split(as.character(labels$cell), labels$cluster)
-averageClustersDistance(probMatrixDF, clustersList)
+scores = data.frame("tool" = NA, "dataset" = dataset, "tuning" = NA, "score" = NA, "residual_variance" = NA, "final_dimensions" = NA)
+for (tool in tools) {
+  for (tuning in tunings) {
+    labelsPath = paste('./data/', dataset, '/', tool, '/', tuning, '/clustering_labels.csv', sep='')
+    labels <- read.csv(labelsPath, header = TRUE)
+    clustersList<- split(as.character(labels$cell), labels$cluster)
+    score_data = averageClustersDistance(probMatrixDF, clustersList)
+    print(score_data)
+    scores$tool = tool
+    scores$tuning = tuning
+    scores$score = score_data$score
+    scores$residual_variance = score_data$residual_variance
+    scores$final_dimensions = score_data$final_dimensions
+  }
+}
+write.csv(scores, outPath, row.names = FALSE)
+scores
 ```
 
