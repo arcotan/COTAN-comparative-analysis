@@ -140,7 +140,7 @@ PBMC <- addClusterization(
 ```{r, echo=TRUE, eval=TRUE}
 mergedClusters <- getClusterizationData(PBMC, clName = "merged")[[1]]
 clusters_sizes = table(mergedClusters)
-cat(paste('Number of clusters found: ', nrows(clusters_sizes), sep=''))
+cat(paste('Number of clusters found: ', nrow(clusters_sizes), sep=''))
 ```
 
 Save the clustering result
@@ -213,7 +213,11 @@ barcodesToKeep = substring(barcodesToKeep, 1, nchar(barcodesToKeep) - 2)
 
 # keep only cells in clusters bigger than minClusterSize cells
 barcodesToDrop = getCells(PBMC)[!getCells(PBMC) %in% barcodesToKeep]
-PBMCCelltypist <- dropGenesCells(PBMC, cells = barcodesToDrop)
+if (length(barcodesToDrop) != 0) {
+  PBMCCelltypist <- dropGenesCells(PBMC, cells = barcodesToDrop)
+} else {
+  PBMCCelltypist <- PBMC
+}
 
 # binary search on GDIThreshold to match the number of clusters found by celltypist
 maxGDIThreshold = 3
@@ -238,7 +242,7 @@ repeat{
     override = TRUE
   )
   celltypistClusters <- getClusterizationData(PBMCCelltypist, clName = "merged_celltypist")[[1]]
-  numClusters = nrows(table(celltypistClusters))
+  numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters < maxNumClusterCelltypist){
     break
@@ -299,7 +303,11 @@ barcodesToKeep = antibodyLabels$cell
 
 # keep only cells labelled with antibody data
 barcodesToDrop = getCells(PBMC)[!getCells(PBMC) %in% barcodesToKeep]
-PBMCAntibody <- dropGenesCells(PBMC, cells = barcodesToDrop)
+if (length(barcodesToDrop) != 0) {
+  PBMCAntibody <- dropGenesCells(PBMC, cells = barcodesToDrop)
+} else {
+  PBMCAntibody <- PBMC
+}
 
 # binary search on GDIThreshold to match the number of clusters found by celltypist
 maxGDIThreshold = 3
@@ -324,7 +332,7 @@ repeat{
     override = TRUE
   )
   antibodyClusters <- getClusterizationData(PBMCAntibody, clName = "merged_antibody")[[1]]
-  numClusters = nrows(table(antibodyClusters))
+  numClusters = nrow(table(antibodyClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterAntibody & numClusters < maxNumClusterAntibody){
     break
