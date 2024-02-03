@@ -80,7 +80,6 @@ for (tool in tools) {
     labels <- read.csv(labelsPath, header = TRUE)
     clustersList<- split(as.character(labels$cell), labels$cluster)
     score_data = averageClustersDistance(probMatrixDF, clustersList)
-    print(score_data)
     scores$tool = tool
     scores$tuning = tuning
     scores$score = score_data$score
@@ -92,3 +91,20 @@ write.csv(scores, outPath, row.names = FALSE)
 scores
 ```
 
+```{r}
+set.seed(42)
+shuffledCells <- rownames(probMatrixDF)
+rndDist <- function(n) {
+  clusters <- set_names(rep(1:n, ceiling(9000/n))[1:nrow(probMatrixDF)], shuffledCells)
+  cluster_list <- split(names(clusters), clusters)
+  d <- averageClustersDistance(probMatrixDF, cluster_list)
+  return(d$score)
+}
+sizes <- c(1:15, seq(20, 50, by = 5), seq(60, 100, by = 10),
+           seq(150, 1000, by = 50), seq(1500, 9000, by = 500))
+sizesToDists <- vapply(sizes, rndDist, numeric(1)) 
+names(sizesToDists) <- sizes
+pdf(paste('./data/', dataset, '/probability_score_dim_dependency.pdf', sep=''))
+plot(names(sizesToDists), sizesToDists)
+dev.off()
+```
