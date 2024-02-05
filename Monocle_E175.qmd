@@ -30,8 +30,8 @@ if (!dir.exists(outDirCelltypist)) {
 
 numClusterThreshold = 1/10
 numClusterCelltypist = fromJSON(file=paste(datasetPath, '/nclusters.json', sep=''))$nclusters
-minNumClusterCelltypist = numClusterCelltypist - numClusterThreshold*numClusterCelltypist
-maxNumClusterCelltypist = numClusterCelltypist - numClusterThreshold+numClusterCelltypist
+minNumClusterCelltypist = round(numClusterCelltypist - numClusterThreshold*numClusterCelltypist)
+maxNumClusterCelltypist = round(numClusterCelltypist + numClusterThreshold*numClusterCelltypist)
 ```
 
 ```{r}
@@ -111,7 +111,7 @@ repeat{
   cds <- cluster_cells(cds, reduction_method = "PCA", resolution=resolution)
   numClusters = length(levels(clusters(cds, reduction_method = "PCA")))
   cat(paste("Got ", numClusters, ' clusters', '\n', sep=''))
-  if (numClusters >= minNumClusterCelltypist & numClusters < maxNumClusterCelltypist){
+  if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
     break
   }
   else if (numClusters < minNumClusterCelltypist){
