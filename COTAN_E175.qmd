@@ -33,8 +33,8 @@ if (!dir.exists(outDirCelltypist)) {
 
 numClusterThreshold = 1/10
 numClusterCelltypist = fromJSON(file=paste(datasetPath, '/nclusters.json', sep=''))$nclusters
-minNumClusterCelltypist = numClusterCelltypist - numClusterThreshold*numClusterCelltypist
-maxNumClusterCelltypist = numClusterCelltypist - numClusterThreshold+numClusterCelltypist
+minNumClusterCelltypist = round(numClusterCelltypist - numClusterThreshold*numClusterCelltypist)
+maxNumClusterCelltypist = round(numClusterCelltypist + numClusterThreshold*numClusterCelltypist)
 
 setLoggingLevel(2)
 setLoggingFile(file.path(outDir, paste(datasetName, ".log", sep='')))
@@ -223,7 +223,7 @@ repeat{
   celltypistClusters <- getClusterizationData(e175, clName = "merged_celltypist")[[1]]
   numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
-  if (numClusters >= minNumClusterCelltypist & numClusters < maxNumClusterCelltypist){
+  if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
     break
   }
   else if (numClusters < minNumClusterCelltypist){
