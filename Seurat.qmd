@@ -18,7 +18,7 @@ Data loading and preparation
 numTopMarkers = 500
 minClusterSize = 0
 
-datasetName = 'PBMC1' # modify this
+datasetName = 'PBMC4' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
 inDir = paste(datasetPath, '/filtered/10X/', sep='')
 outDir = paste(datasetPath, '/seurat/', sep='')
@@ -38,11 +38,11 @@ if (!dir.exists(outDirAntibody)) {
 
 numClusterThreshold = 1/10
 numClusterCelltypist = fromJSON(file=paste(datasetPath, '/celltypist/nclusters.json', sep=''))$nclusters
-minNumClusterCelltypist = numClusterCelltypist - numClusterThreshold*numClusterCelltypist
-maxNumClusterCelltypist = numClusterCelltypist - numClusterThreshold+numClusterCelltypist
+minNumClusterCelltypist = round(numClusterCelltypist - numClusterThreshold*numClusterCelltypist)
+maxNumClusterCelltypist = round(numClusterCelltypist + numClusterThreshold*numClusterCelltypist)
 numClusterAntibody = fromJSON(file=paste(datasetPath, '/antibody_annotation/nclusters.json', sep=''))$nclusters
-minNumClusterAntibody = numClusterAntibody - numClusterThreshold*numClusterAntibody
-maxNumClusterAntibody = numClusterAntibody - numClusterThreshold+numClusterAntibody
+minNumClusterAntibody = round(numClusterAntibody - numClusterThreshold*numClusterAntibody)
+maxNumClusterAntibody = round(numClusterAntibody + numClusterThreshold*numClusterAntibody)
 ```
 
 Dataset loading
@@ -163,7 +163,7 @@ repeat{
   pbmcCelltypist <- FindClusters(pbmcCelltypist, resolution=resolution)
   numClusters = nlevels(Idents(pbmcCelltypist))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
-  if (numClusters >= minNumClusterCelltypist & numClusters < maxNumClusterCelltypist){
+  if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
     break
   }
   else if (numClusters < minNumClusterCelltypist){
@@ -236,7 +236,7 @@ repeat{
   pbmcAntibody <- FindClusters(pbmcAntibody, resolution=resolution)
   numClusters = nlevels(Idents(pbmcAntibody))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
-  if (numClusters >= minNumClusterAntibody & numClusters < maxNumClusterAntibody){
+  if (numClusters >= minNumClusterAntibody & numClusters <= maxNumClusterAntibody){
     break
   }
   else if (numClusters < minNumClusterAntibody){
