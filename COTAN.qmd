@@ -172,7 +172,7 @@ saveRDS(PBMC, file = file.path(outDirDefault, paste0(datasetName, ".cotan.RDS"))
 Save markers
 
 ```{r, echo=TRUE, eval=FALSE}
-write_cotan_markes = function(ourDir, clusters, coex, numTopMarkers, decreasing) {
+write_cotan_markes = function(outDir, clusters, coex, numTopMarkers, decreasing) {
     markers = data.frame()
 
     for (cluster_id in (levels(clusters))) {
@@ -187,7 +187,7 @@ write_cotan_markes = function(ourDir, clusters, coex, numTopMarkers, decreasing)
     }
     colnames(markers) = c("gene","cluster","rank")
 
-    write.csv(markers, "markers.csv", row.names = FALSE)
+    write.csv(markers, paste(outDir, "markers.csv", sep=''), row.names = FALSE)
 }
 
 numCells <- getNumCells(PBMC)
