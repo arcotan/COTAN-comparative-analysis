@@ -41,8 +41,8 @@ numClusterCelltypist = fromJSON(file=paste(datasetPath, '/celltypist/nclusters.j
 minNumClusterCelltypist = numClusterCelltypist - numClusterThreshold*numClusterCelltypist
 maxNumClusterCelltypist = numClusterCelltypist - numClusterThreshold+numClusterCelltypist
 numClusterAntibody = fromJSON(file=paste(datasetPath, '/antibody_annotation/nclusters.json', sep=''))$nclusters
-minNumClusterAntibody = numClusterAntibody - numClusterThreshold*numClusterAntibody
-maxNumClusterAntibody = numClusterAntibody - numClusterThreshold+numClusterAntibody
+minNumClusterAntibody = round(numClusterAntibody - numClusterThreshold*numClusterAntibody)
+maxNumClusterAntibody = round(numClusterAntibody + numClusterThreshold*numClusterAntibody)
 
 setLoggingLevel(2)
 setLoggingFile(file.path(outDir, paste(datasetName, ".log", sep='')))
@@ -334,7 +334,7 @@ repeat{
   antibodyClusters <- getClusterizationData(PBMCAntibody, clName = "merged_antibody")[[1]]
   numClusters = nrow(table(antibodyClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
-  if (numClusters >= minNumClusterAntibody & numClusters < maxNumClusterAntibody){
+  if (numClusters >= minNumClusterAntibody & numClusters <= maxNumClusterAntibody){
     break
   }
   else if (numClusters < minNumClusterAntibody){
