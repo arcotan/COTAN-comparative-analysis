@@ -140,7 +140,7 @@ e175 <- addClusterization(
 ```{r, echo=TRUE, eval=TRUE}
 mergedClusters <- getClusterizationData(e175, clName = "merged")[[1]] # TODO: change name
 clusters_sizes = table(mergedClusters)
-cat(paste('Number of clusters found: ', nrows(clusters_sizes), sep=''))
+cat(paste('Number of clusters found: ', nrow(clusters_sizes), sep=''))
 ```
 
 Save the clustering result
@@ -172,7 +172,7 @@ saveRDS(e175, file = file.path(outDirDefault, paste0(datasetName, ".cotan.RDS"))
 Save markers
 
 ```{r, echo=TRUE, eval=FALSE}
-write_cotan_markes = function(ourDir, clusters, coex, numTopMarkers, decreasing) {
+write_cotan_markes = function(outDir, clusters, coex, numTopMarkers, decreasing) {
     markers = data.frame()
 
     for (cluster_id in (levels(clusters))) {
@@ -187,7 +187,7 @@ write_cotan_markes = function(ourDir, clusters, coex, numTopMarkers, decreasing)
     }
     colnames(markers) = c("gene","cluster","rank")
 
-    write.csv(markers, "markers.csv", row.names = FALSE)
+    write.csv(markers, paste(outDir, "markers.csv", sep=''), row.names = FALSE)
 }
 
 numCells <- getNumCells(e175)
@@ -221,7 +221,7 @@ repeat{
     override = TRUE
   )
   celltypistClusters <- getClusterizationData(e175, clName = "merged_celltypist")[[1]]
-  numClusters = nrows(table(celltypistClusters))
+  numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters < maxNumClusterCelltypist){
     break
