@@ -17,7 +17,7 @@ library(cluster)
 library(COTAN)
 
 tunings = c('default')#, 'antibody', 'celltypist')
-tools = c('monocle')#, 'scanpy', 'seurat', 'scvi-tools', 'COTAN')
+tools = c('monocle', 'scanpy', 'seurat', 'scvi-tools', 'COTAN')
 dataset = 'PBMC1'
 celltypistPath = paste('./data/', dataset, '/celltypist/Immune_All_Low_probability_matrix.csv', sep='')
 outPath = paste('./data/', dataset, '/probabilistic_score.csv', sep='')
@@ -73,18 +73,24 @@ averageClustersDistance <- function(probMatrixDF,
 ```
 
 ```{r}
-scores = data.frame("tool" = NA, "dataset" = dataset, "tuning" = NA, "score" = NA, "residual_variance" = NA, "final_dimensions" = NA)
+scores = data.frame()#"tool" = NA, "dataset" = dataset, "tuning" = NA, "score" = NA, "residual_variance" = NA, "final_dimensions" = NA)
 for (tool in tools) {
   for (tuning in tunings) {
     labelsPath = paste('./data/', dataset, '/', tool, '/', tuning, '/clustering_labels.csv', sep='')
     labels <- read.csv(labelsPath, header = TRUE)
     clustersList<- split(as.character(labels$cell), labels$cluster)
     score_data = averageClustersDistance(probMatrixDF, clustersList)
-    scores$tool = tool
-    scores$tuning = tuning
-    scores$score = score_data$score
-    scores$residual_variance = score_data$residual_variance
-    scores$final_dimensions = score_data$final_dimensions
+    scores = rbind(
+      scores,
+      data.frame(
+        "tool" = tool,
+        "dataset" = dataset,
+        "tuning" = tuning,
+        "score" = score_data$score,
+        "residual_variance" = score_data$residual_variance,
+        "final_dimensions" = score_data$final_dimensions
+      )
+    )
   }
 }
 write.csv(scores, outPath, row.names = FALSE)
