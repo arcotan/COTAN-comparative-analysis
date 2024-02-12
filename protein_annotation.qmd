@@ -11,12 +11,14 @@ library(scran)
 library(pheatmap)
 library(pheatmap)
 library(scuttle)
+library(bluster)
+library(igraph)
 
+set.seed(42)
 datasetName = 'PBMC1' # modify this
 isotypeControl = '^Ig' # or '^isotype_control'
 datasetFolder = './data/'
 rawDataDir = paste(datasetFolder, datasetName, '/raw/10X/', sep='')
-filteredDataDir = paste(datasetFolder, datasetName, '/filtered/10X/', sep='')
 outDataDir = paste(datasetFolder, datasetName, '/antibody_annotation/', sep='')
 ```
 
@@ -115,7 +117,7 @@ summary(sf.amb)
 Factors visualization:
 
 ```{r}
-tagdata <- logNormCounts(altExp(sce)) 
+tagdata <- logNormCounts(altExp(sce))
 clusters <- clusterCells(tagdata, assay.type="logcounts") 
 
 by.clust <- split(log2(sf.amb/sf.lib), clusters)
@@ -128,6 +130,7 @@ controls <- grep(isotypeControl, rownames(altExp(sce)))
 sf.control <- librarySizeFactors(altExp(sce), subset_row=controls) 
 summary(sf.control)
 ```
+
 ```{r}
 plot(sf.amb, sf.control, log="xy", 
     xlab="median-based size factors (tag)",
@@ -156,8 +159,9 @@ assayNames(altExp(sce))
 Performing the clustering and visualizing cells in a t-SNE plot:
 
 ```{r}
-clusters.adt <- clusterCells(altExp(sce), assay.type="logcounts")
-set.seed(1010010)
+#clusterParams = NNGraphParam(cluster.fun="louvain", cluster.args=list(resolution=2))
+#clusterParams = NNGraphParam(cluster.fun=cluster_walktrap, cluster.args=list(steps=2))
+clusters.adt <- clusterCells(altExp(sce), assay.type="logcounts") #, BLUSPARAM=clusterParams)
 altExp(sce) <- runTSNE(altExp(sce))
 colLabels(altExp(sce)) <- factor(clusters.adt)
 plotTSNE(altExp(sce), colour_by="label", text_by="label", text_color="red")
