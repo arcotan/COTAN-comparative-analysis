@@ -11,6 +11,8 @@ def sankey_plot(
         title,
         colored_links=False,
         link_opacity=0.4,
+        width=700,
+        height=450,
     ):
     '''
     This function plots a Sankey diagram of the sets of labels passed as arguments.
@@ -90,7 +92,9 @@ def sankey_plot(
         xaxis={'showgrid': False, 'zeroline': False, 'visible': False},
         yaxis={'showgrid': False, 'zeroline': False, 'visible': False},
         plot_bgcolor='rgba(0,0,0,0)',
-        font_size=10
+        font_size=10,
+        width=width,
+        height=height
     )
 
     pyo.plot(fig, filename=path, auto_open=False)
