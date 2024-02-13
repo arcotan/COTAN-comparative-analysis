@@ -245,6 +245,7 @@ repeat{
   numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
+    write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirCelltypist, 'GDIthreshold.json',sep=''))
     break
   }
   else if (numClusters < minNumClusterCelltypist){
@@ -335,6 +336,7 @@ repeat{
   numClusters = nrow(table(antibodyClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterAntibody & numClusters <= maxNumClusterAntibody){
+    write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirAntibody, 'GDIthreshold.json',sep=''))
     break
   }
   else if (numClusters < minNumClusterAntibody){
