@@ -40,7 +40,7 @@ numClusterThreshold = 1/10
 numClusterCelltypist = fromJSON(file=paste(datasetPath, '/celltypist/nclusters.json', sep=''))$nclusters
 minNumClusterCelltypist = round(numClusterCelltypist - numClusterThreshold*numClusterCelltypist)
 maxNumClusterCelltypist = round(numClusterCelltypist + numClusterThreshold*numClusterCelltypist)
-numClusterAntibody = fromJSON(file=paste(datasetPath, '/antibody_annotation/nclusters.json', sep=''))$nclusters
+numClusterAntibody = fromJSON(file=paste(datasetPath, '/antibody_annotation/nclusters_postproc.json', sep=''))$nclusters
 minNumClusterAntibody = round(numClusterAntibody - numClusterThreshold*numClusterAntibody)
 maxNumClusterAntibody = round(numClusterAntibody + numClusterThreshold*numClusterAntibody)
 
@@ -297,7 +297,7 @@ Merge clusters according to protein surface
 
 ```{r, echo=TRUE, eval=FALSE}
 # get barcodes of cells labelled using antibody data
-antibodyLabels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels.csv', sep=''))
+antibodyLabels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels_postproc.csv', sep=''))
 barcodesToKeep = antibodyLabels$cell
 
 # barcodesToKeep = substring(barcodesToKeep, 1, nchar(barcodesToKeep) - 2) # TODO: ?
