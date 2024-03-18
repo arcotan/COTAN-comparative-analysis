@@ -245,16 +245,17 @@ repeat{
   numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
+    cat(paste("GDI: ", GDIThreshold, sep=''))
     write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirCelltypist, 'GDIthreshold.json',sep=''))
     break
   }
   else if (numClusters < minNumClusterCelltypist){
     # increase GDIThreshold
-    minGDIThreshold = GDIThreshold
+    maxGDIThreshold = GDIThreshold
   }
   else{
     # reduce GDIThreshold
-    maxGDIThreshold = GDIThreshold
+    minGDIThreshold = GDIThreshold
   }
 }
 ```

@@ -115,6 +115,17 @@ splitClusters <- getClusterizationData(e175, clName = "split")[[1]]
 table(splitClusters)
 ```
 
+Save the clustering result
+
+```{r, echo=TRUE, eval=FALSE}
+clustersDf = as.data.frame(splitClusters)
+colnames(clustersDf)[colnames(clustersDf) == deparse(substitute(splitClusters))] <- "cluster"
+clustersDf$cluster = match(clustersDf$cluster, levels(splitClusters))
+clustersDf$cell = rownames(clustersDf)
+rownames(clustersDf) = c(1:nrow(clustersDf))
+write_clustering(outDirDefault, clustersDf, "cell", "cluster")
+```
+
 Merge uniform clusters
 
 ```{r, echo=TRUE, eval=FALSE}
@@ -122,7 +133,7 @@ c(mergedClusters, mergedCoexDF) %<-%
   mergeUniformCellsClusters(
     e175,
     clusters = splitClusters,
-    GDIThreshold = defaultGDIThreshold,
+    GDIThreshold = 2,#defaultGDIThreshold,
     cores = numCores,
     saveObj = TRUE,
     outDir = outDir
@@ -138,7 +149,7 @@ e175 <- addClusterization(
 ```
 
 ```{r, echo=TRUE, eval=TRUE}
-mergedClusters <- getClusterizationData(e175, clName = "merged")[[1]] # TODO: change name
+mergedClusters <- getClusterizationData(e175, clName = "merged")[[1]]
 clusters_sizes = table(mergedClusters)
 cat(paste('Number of clusters found: ', nrow(clusters_sizes), sep=''))
 ```
@@ -203,7 +214,7 @@ maxGDIThreshold = 3
 minGDIThreshold = 0
 repeat{
   GDIThreshold = (maxGDIThreshold + minGDIThreshold) / 2
-  cat(paste("Trying GDIThreshold ", GDIThreshold, sep=''))
+  cat(paste("Trying GDIThreshold ", GDIThreshold, '\n', sep=''))
   c(celltypistClusters, celltypistCoexDF) %<-%
   mergeUniformCellsClusters(
     e175,
@@ -224,15 +235,17 @@ repeat{
   numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
+    cat(paste("GDI: ", GDIThreshold, sep=''))
+    write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirCelltypist, 'GDIthreshold.json',sep=''))
     break
   }
   else if (numClusters < minNumClusterCelltypist){
     # increase GDIThreshold
-    minGDIThreshold = GDIThreshold
+    maxGDIThreshold = GDIThreshold
   }
   else{
     # reduce GDIThreshold
-    maxGDIThreshold = GDIThreshold
+    minGDIThreshold = GDIThreshold
   }
 }
 ```
