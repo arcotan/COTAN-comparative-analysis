@@ -1,3 +1,6 @@
+pid <- Sys.getpid()
+cat("Process ID:", pid, "\n")
+
 library(COTAN)
 library(Seurat)
 library(tibble)
@@ -7,12 +10,12 @@ library(rjson)
 source("./utils.R")
 options(parallelly.fork.enable = TRUE)
 
-numCores = 8
+numCores = 4
 defaultGDIThreshold = 1.4
 numTopMarkers = 500
 minClusterSize = 0
 
-datasetName = 'PBMC1' # modify this
+datasetName = 'PBMC4' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
 inDir = paste(datasetPath, '/filtered/', sep='')
 outDir = paste(datasetPath, '/COTAN/', sep='')
@@ -226,16 +229,17 @@ repeat{
   numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
+    cat(paste("GDI: ", GDIThreshold, sep=''))
     write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirCelltypist, 'GDIthreshold.json',sep=''))
     break
   }
   else if (numClusters < minNumClusterCelltypist){
     # increase GDIThreshold
-    minGDIThreshold = GDIThreshold
+    maxGDIThreshold = GDIThreshold
   }
   else{
     # reduce GDIThreshold
-    maxGDIThreshold = GDIThreshold
+    minGDIThreshold = GDIThreshold
   }
 }
 
