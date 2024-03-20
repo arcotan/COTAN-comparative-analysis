@@ -336,17 +336,18 @@ repeat{
   antibodyClusters <- getClusterizationData(PBMCAntibody, clName = "merged_antibody")[[1]]
   numClusters = nrow(table(antibodyClusters))
   cat(paste("Got ", numClusters, ' clusters', sep=''))
+  cat(paste("Got ", numClusters, ' clusters', sep=''))
   if (numClusters >= minNumClusterAntibody & numClusters <= maxNumClusterAntibody){
     write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirAntibody, 'GDIthreshold.json',sep=''))
     break
   }
   else if (numClusters < minNumClusterAntibody){
     # increase the GDIThreshold
-    minGDIThreshold = GDIThreshold
+    maxGDIThreshold = GDIThreshold
   }
   else{
     # reduce the GDIThreshold
-    maxGDIThreshold = GDIThreshold
+    minGDIThreshold = GDIThreshold
   }
 }
 ```
