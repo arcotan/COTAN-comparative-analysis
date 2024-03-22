@@ -204,8 +204,12 @@ if (length(barcodesToDrop) != 0) {
 }
 
 # binary search on GDIThreshold to match the number of clusters found by celltypist
+cat(paste("binary search on GDIThreshold to match the number of clusters found by celltypist\n", sep=''))
+cat(paste("minNumClusterCelltypist:", minNumClusterCelltypist, ' maxNumClusterCelltypist:', maxNumClusterCelltypist, '\n', sep=''))
+
 maxGDIThreshold = 3
-minGDIThreshold = 0
+minGDIThreshold = 1.35
+
 repeat{
   GDIThreshold = (maxGDIThreshold + minGDIThreshold) / 2
   cat(paste("Trying GDIThreshold ", GDIThreshold, sep=''))
@@ -227,18 +231,19 @@ repeat{
   )
   celltypistClusters <- getClusterizationData(PBMCCelltypist, clName = "merged_celltypist")[[1]]
   numClusters = nrow(table(celltypistClusters))
-  cat(paste("Got ", numClusters, ' clusters', sep=''))
+  cat(paste("Got ", numClusters, ' clusters\n', sep=''))
+  cat(paste("GDI: ", GDIThreshold,'\n' sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
-    cat(paste("GDI: ", GDIThreshold, sep=''))
+    cat(paste("exit the cycle\n", sep=''))
     write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirCelltypist, 'GDIthreshold.json',sep=''))
     break
   }
   else if (numClusters < minNumClusterCelltypist){
-    # increase GDIThreshold
+    cat(paste("reducing the GDI \n", sep=''))
     maxGDIThreshold = GDIThreshold
   }
   else{
-    # reduce GDIThreshold
+    cat(paste("increasing the GDI \n", sep=''))
     minGDIThreshold = GDIThreshold
   }
 }
@@ -285,9 +290,13 @@ if (length(barcodesToDrop) != 0) {
   PBMCAntibody <- PBMC
 }
 
-# binary search on GDIThreshold to match the number of clusters found by celltypist
+
+# binary search on GDIThreshold to match the number of clusters found by antibody
+cat(paste("binary search on GDIThreshold to match the number of clusters found by celltypist\n", sep=''))
+cat(paste("minNumClusterAntibody:", minNumClusterAntibody, ' maxNumClusterAntibody:', maxNumClusterAntibody, '\n', sep=''))
+
 maxGDIThreshold = 3
-minGDIThreshold = 0
+minGDIThreshold = 1.35
 repeat{
   GDIThreshold = (maxGDIThreshold + minGDIThreshold) / 2
   cat(paste("Trying GDIThreshold ", GDIThreshold, sep=''))
@@ -309,18 +318,19 @@ repeat{
   )
   antibodyClusters <- getClusterizationData(PBMCAntibody, clName = "merged_antibody")[[1]]
   numClusters = nrow(table(antibodyClusters))
-  cat(paste("Got ", numClusters, ' clusters', sep=''))
-  cat(paste("Got ", numClusters, ' clusters', sep=''))
+  cat(paste("Got ", numClusters, ' clusters\n', sep=''))
+  cat(paste("Got ", numClusters, ' clusters\n', sep=''))
   if (numClusters >= minNumClusterAntibody & numClusters <= maxNumClusterAntibody){
     write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirAntibody, 'GDIthreshold.json',sep=''))
+    cat(paste("exit the cycle\n", sep=''))
     break
   }
   else if (numClusters < minNumClusterAntibody){
-    # increase the GDIThreshold
+    cat(paste("reducing the GDI \n", sep=''))
     maxGDIThreshold = GDIThreshold
   }
   else{
-    # reduce the GDIThreshold
+    cat(paste("increasing the GDI \n", sep=''))
     minGDIThreshold = GDIThreshold
   }
 }
