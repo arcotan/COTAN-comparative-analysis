@@ -232,7 +232,7 @@ repeat{
   celltypistClusters <- getClusterizationData(PBMCCelltypist, clName = "merged_celltypist")[[1]]
   numClusters = nrow(table(celltypistClusters))
   cat(paste("Got ", numClusters, ' clusters\n', sep=''))
-  cat(paste("GDI: ", GDIThreshold,'\n' sep=''))
+  cat(paste("GDI: ", GDIThreshold,'\n', sep=''))
   if (numClusters >= minNumClusterCelltypist & numClusters <= maxNumClusterCelltypist){
     cat(paste("exit the cycle\n", sep=''))
     write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirCelltypist, 'GDIthreshold.json',sep=''))
@@ -319,7 +319,7 @@ repeat{
   antibodyClusters <- getClusterizationData(PBMCAntibody, clName = "merged_antibody")[[1]]
   numClusters = nrow(table(antibodyClusters))
   cat(paste("Got ", numClusters, ' clusters\n', sep=''))
-  cat(paste("Got ", numClusters, ' clusters\n', sep=''))
+  cat(paste("GDI: ", GDIThreshold,'\n', sep=''))
   if (numClusters >= minNumClusterAntibody & numClusters <= maxNumClusterAntibody){
     write(toJSON(list(GDI_threshold=GDIThreshold)), file=paste(outDirAntibody, 'GDIthreshold.json',sep=''))
     cat(paste("exit the cycle\n", sep=''))
