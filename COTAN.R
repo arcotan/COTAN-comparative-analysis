@@ -202,7 +202,7 @@ if (length(barcodesToDrop) != 0) {
 } else {
   PBMCCelltypist <- PBMC
 }
-splitClusters = splitClusters[!names(splitClusters) %in% barcodesToDrop]
+splitClustersCT = splitClusters[!names(splitClusters) %in% barcodesToDrop]
 
 
 # binary search on GDIThreshold to match the number of clusters found by celltypist
@@ -218,7 +218,7 @@ repeat{
   c(celltypistClusters, celltypistCoexDF) %<-%
   mergeUniformCellsClusters(
     PBMCCelltypist,
-    clusters = splitClusters,
+    clusters = splitClustersCT,
     GDIThreshold = GDIThreshold,
     cores = numCores,
     saveObj = TRUE,
@@ -291,6 +291,7 @@ if (length(barcodesToDrop) != 0) {
 } else {
   PBMCAntibody <- PBMC
 }
+splitClustersAB = splitClusters[!names(splitClusters) %in% barcodesToDrop]
 
 
 # binary search on GDIThreshold to match the number of clusters found by antibody
@@ -305,7 +306,7 @@ repeat{
   c(abtibodyClusters, antibodyCoexDF) %<-%
   mergeUniformCellsClusters(
     PBMCAntibody,
-    clusters = splitClusters,
+    clusters = splitClustersAB,
     GDIThreshold = GDIThreshold,
     cores = numCores,
     saveObj = TRUE,
