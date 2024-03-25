@@ -202,6 +202,8 @@ if (length(barcodesToDrop) != 0) {
 } else {
   PBMCCelltypist <- PBMC
 }
+splitClusters <- getClusterizationData(PBMC, clName = "split")[[1]]
+
 
 # binary search on GDIThreshold to match the number of clusters found by celltypist
 cat(paste("binary search on GDIThreshold to match the number of clusters found by celltypist\n", sep=''))
