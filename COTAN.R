@@ -303,7 +303,7 @@ minGDIThreshold = 1.35
 repeat{
   GDIThreshold = (maxGDIThreshold + minGDIThreshold) / 2
   cat(paste("Trying GDIThreshold ", GDIThreshold, sep=''))
-  c(abtibodyClusters, antibodyCoexDF) %<-%
+  c(antibodyClusters, antibodyCoexDF) %<-%
   mergeUniformCellsClusters(
     PBMCAntibody,
     clusters = splitClustersAB,
