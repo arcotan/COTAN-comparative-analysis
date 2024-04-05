@@ -15,7 +15,7 @@ defaultGDIThreshold = 1.4
 numTopMarkers = 500
 minClusterSize = 0
 
-datasetName = 'PBMC4' # modify this
+datasetName = 'PBMC1' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
 inDir = paste(datasetPath, '/filtered/', sep='')
 outDir = paste(datasetPath, '/COTAN/', sep='')
@@ -295,7 +295,7 @@ splitClustersAB = splitClusters[!names(splitClusters) %in% barcodesToDrop]
 
 
 # binary search on GDIThreshold to match the number of clusters found by antibody
-cat(paste("binary search on GDIThreshold to match the number of clusters found by celltypist\n", sep=''))
+cat(paste("binary search on GDIThreshold to match the number of clusters found by antibody\n", sep=''))
 cat(paste("minNumClusterAntibody:", minNumClusterAntibody, ' maxNumClusterAntibody:', maxNumClusterAntibody, '\n', sep=''))
 
 maxGDIThreshold = 3
