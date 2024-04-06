@@ -15,7 +15,7 @@ defaultGDIThreshold = 1.4
 numTopMarkers = 500
 minClusterSize = 0
 
-datasetName = 'PBMC1' # modify this
+datasetName = 'PBMC2' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
 inDir = paste(datasetPath, '/filtered/', sep='')
 outDir = paste(datasetPath, '/COTAN/', sep='')
@@ -204,6 +204,13 @@ if (length(barcodesToDrop) != 0) {
 }
 splitClustersCT = splitClusters[!names(splitClusters) %in% barcodesToDrop]
 
+PBMCCelltypist <- proceedToCoex(
+  PBMCCelltypist,
+  calcCoex = FALSE,
+  cores = numCores,
+  saveObj = TRUE,
+  outDir = outDir
+)
 
 # binary search on GDIThreshold to match the number of clusters found by celltypist
 cat(paste("binary search on GDIThreshold to match the number of clusters found by celltypist\n", sep=''))
@@ -293,6 +300,13 @@ if (length(barcodesToDrop) != 0) {
 }
 splitClustersAB = splitClusters[!names(splitClusters) %in% barcodesToDrop]
 
+PBMCAntibody <- proceedToCoex(
+  PBMCAntibody,
+  calcCoex = FALSE,
+  cores = numCores,
+  saveObj = TRUE,
+  outDir = outDir
+)
 
 # binary search on GDIThreshold to match the number of clusters found by antibody
 cat(paste("binary search on GDIThreshold to match the number of clusters found by antibody\n", sep=''))
