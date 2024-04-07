@@ -15,7 +15,7 @@ defaultGDIThreshold = 1.4
 numTopMarkers = 500
 minClusterSize = 0
 
-datasetName = 'PBMC2' # modify this
+datasetName = 'PBMC3' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
 inDir = paste(datasetPath, '/filtered/', sep='')
 outDir = paste(datasetPath, '/COTAN/', sep='')
@@ -145,40 +145,40 @@ clustersDf$cell = rownames(clustersDf)
 rownames(clustersDf) = c(1:nrow(clustersDf))
 write_clustering(outDirDefault, clustersDf, "cell", "cluster")
 
-# Differential expression
+# # Differential expression
 
-coexDF <- DEAOnClusters(PBMC, clusters = mergedClusters)
-PBMC <- addClusterizationCoex(
-  PBMC,
-  clName = "merged",
-  coexDF = coexDF
-)
+# coexDF <- DEAOnClusters(PBMC, clusters = mergedClusters)
+# PBMC <- addClusterizationCoex(
+#   PBMC,
+#   clName = "merged",
+#   coexDF = coexDF
+# )
 
-saveRDS(PBMC, file = file.path(outDirDefault, paste0(datasetName, ".cotan.RDS")))
+# saveRDS(PBMC, file = file.path(outDirDefault, paste0(datasetName, ".cotan.RDS")))
 
-# Save markers
+# # Save markers
 
-write_cotan_markes = function(outDir, clusters, coex, numTopMarkers, decreasing) {
-    markers = data.frame()
+# write_cotan_markes = function(outDir, clusters, coex, numTopMarkers, decreasing) {
+#     markers = data.frame()
 
-    for (cluster_id in (levels(clusters))) {
-        cluster_markers = data.frame()
-        pv = coex[, cluster_id]
-        names(pv) = rownames(coex)
-        sorted_pv = sort(pv, decreasing = decreasing)
-        cluster_markers = data.frame(gene = names(sorted_pv)[1:numTopMarkers],
-                                    cluster = match(cluster_id, levels(clusters)),
-                                    rank = 1:numTopMarkers)
-        markers = rbind(markers, cluster_markers)
-    }
-    colnames(markers) = c("gene","cluster","rank")
+#     for (cluster_id in (levels(clusters))) {
+#         cluster_markers = data.frame()
+#         pv = coex[, cluster_id]
+#         names(pv) = rownames(coex)
+#         sorted_pv = sort(pv, decreasing = decreasing)
+#         cluster_markers = data.frame(gene = names(sorted_pv)[1:numTopMarkers],
+#                                     cluster = match(cluster_id, levels(clusters)),
+#                                     rank = 1:numTopMarkers)
+#         markers = rbind(markers, cluster_markers)
+#     }
+#     colnames(markers) = c("gene","cluster","rank")
 
-    write.csv(markers, paste(outDir, "markers.csv", sep=''), row.names = FALSE)
-}
+#     write.csv(markers, paste(outDir, "markers.csv", sep=''), row.names = FALSE)
+# }
 
-numCells <- getNumCells(PBMC)
-pvalsDefault <- pValueFromDEA(coexDF, numCells)
-write_cotan_markes(outDirDefault, mergedClusters, pvalsDefault, numTopMarkers, FALSE)
+# numCells <- getNumCells(PBMC)
+# pvalsDefault <- pValueFromDEA(coexDF, numCells)
+# write_cotan_markes(outDirDefault, mergedClusters, pvalsDefault, numTopMarkers, FALSE)
 
 # Merge clusters according to celltypist
 
@@ -266,22 +266,22 @@ celltypistClustersDf$cell = rownames(celltypistClustersDf)
 rownames(celltypistClustersDf) = c(1:nrow(celltypistClustersDf))
 write_clustering(outDirCelltypist, celltypistClustersDf, "cell", "cluster")
 
-# Differential expression
+# # Differential expression
 
-celltypistCoexDF <- DEAOnClusters(PBMCCelltypist, clusters = celltypistClusters)
-PBMCCelltypist <- addClusterizationCoex(
-  PBMCCelltypist,
-  clName = "merged_celltypist",
-  coexDF = celltypistCoexDF
-)
+# celltypistCoexDF <- DEAOnClusters(PBMCCelltypist, clusters = celltypistClusters)
+# PBMCCelltypist <- addClusterizationCoex(
+#   PBMCCelltypist,
+#   clName = "merged_celltypist",
+#   coexDF = celltypistCoexDF
+# )
 
-saveRDS(PBMC, file = file.path(outDirCelltypist, paste0(datasetName, ".cotan.RDS")))
+# saveRDS(PBMC, file = file.path(outDirCelltypist, paste0(datasetName, ".cotan.RDS")))
 
-# Save markers
+# # Save markers
 
-celltypistNumCells <- getNumCells(PBMCCelltypist)
-celltypistPvals <- pValueFromDEA(celltypistCoexDF, celltypistNumCells)
-write_cotan_markes(outDirCelltypist, celltypistClusters, celltypistPvals, numTopMarkers, FALSE)
+# celltypistNumCells <- getNumCells(PBMCCelltypist)
+# celltypistPvals <- pValueFromDEA(celltypistCoexDF, celltypistNumCells)
+# write_cotan_markes(outDirCelltypist, celltypistClusters, celltypistPvals, numTopMarkers, FALSE)
 
 # Merge clusters according to protein surface
 
@@ -361,21 +361,21 @@ antibodyClustersDf$cell = rownames(antibodyClustersDf)
 rownames(antibodyClustersDf) = c(1:nrow(antibodyClustersDf))
 write_clustering(outDirAntibody, antibodyClustersDf, "cell", "cluster")
 
-# Differential expression
+# # Differential expression
 
-antibodyCoexDF <- DEAOnClusters(PBMCAntibody, clusters = antibodyClusters)
-PBMCAntibody <- addClusterizationCoex(
-  PBMCAntibody,
-  clName = "merged_antibody",
-  coexDF = antibodyCoexDF
-)
+# antibodyCoexDF <- DEAOnClusters(PBMCAntibody, clusters = antibodyClusters)
+# PBMCAntibody <- addClusterizationCoex(
+#   PBMCAntibody,
+#   clName = "merged_antibody",
+#   coexDF = antibodyCoexDF
+# )
 
-saveRDS(PBMC, file = file.path(outDirAntibody, paste0(datasetName, ".cotan.RDS")))
+# saveRDS(PBMC, file = file.path(outDirAntibody, paste0(datasetName, ".cotan.RDS")))
 
-# Save markers
+# # Save markers
 
-numCells <- getNumCells(PBMCAntibody)
-antibodyPvals <- pValueFromDEA(antibodyCoexDF, numCells)
-write_cotan_markes(OUT_PROTEIN_DIR, antibodyClusters, antibodyPvals, numTopMarkers, FALSE)
+# numCells <- getNumCells(PBMCAntibody)
+# antibodyPvals <- pValueFromDEA(antibodyCoexDF, numCells)
+# write_cotan_markes(outDirAntibody, antibodyClusters, antibodyPvals, numTopMarkers, FALSE)
 
 sessionInfo()
