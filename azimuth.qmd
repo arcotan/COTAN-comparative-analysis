@@ -1,0 +1,111 @@
+
+
+WORKFLOW FOR PBMC DATASET
+
+```{r, echo=TRUE, eval=TRUE}
+
+library(Seurat)
+library(Azimuth)
+library(SeuratData)
+library(patchwork)
+```
+
+```{r, echo=TRUE, eval=TRUE}
+datasetName = 'PBMC4' # modify this
+datasetPath = paste("./data/", datasetName, sep='')
+inDir = paste(datasetPath, '/filtered/10X/', sep='')
+
+pbmc.data <- Read10X(inDir, strip.suffix=TRUE)
+pbmc <- CreateSeuratObject(counts = pbmc.data, min.cells = 0, min.features = 0)
+
+```
+```{r, echo=TRUE, eval=TRUE}
+
+bm <- RunAzimuth(query = pbmc, reference = "pbmcref")
+
+# Extract prediction scores
+celltype_l2_scores <- bm[["prediction.score.celltype.l2"]]@data
+celltype_l1_scores <- bm[["prediction.score.celltype.l1"]]@data
+celltype_l3_scores <- bm[["prediction.score.celltype.l3"]]@data
+
+# I want cell Ids as rows and cluster probabilities as columns
+celltype_l1_scores <- t(celltype_l1_scores)
+celltype_l2_scores <- t(celltype_l2_scores)
+celltype_l3_scores <- t(celltype_l3_scores)
+
+```
+```{r, echo=TRUE, eval=TRUE}
+
+# Create a data frame with cell IDs as the first column and cluster probabilities as subsequent columns
+output_df_l1 <- data.frame(cell = rownames(celltype_l1_scores), celltype_l1_scores)
+output_df_l2 <- data.frame(cell = rownames(celltype_l2_scores), celltype_l2_scores)
+output_df_l3 <- data.frame(cell = rownames(celltype_l3_scores), celltype_l3_scores)
+
+# Write this data frame to a CSV file
+write.csv(output_df_l1, paste('./azimuth_labels/', datasetName, '_level_1', sep=''), row.names = FALSE)
+write.csv(output_df_l2, paste('./azimuth_labels/', datasetName, '_level_2', sep=''), row.names = FALSE)
+write.csv(output_df_l3, paste('./azimuth_labels/', datasetName, '_level_3', sep=''), row.names = FALSE)
+
+```
+
+```{r, echo=TRUE, eval=TRUE}
+```
+
+
+WORKFLOW FOR E17.5 DATASET
+
+```{r, echo=TRUE, eval=TRUE}
+
+library(dplyr)
+library(rjson)
+library(Seurat)
+library(patchwork)
+library(DropletUtils)
+library(rjson)
+library(Azimuth)
+
+datasetName = 'E175'
+datasetPath = paste("./data/", datasetName, sep='')
+
+```
+
+```{r, echo=TRUE, eval=TRUE}
+matrix <- read.csv(paste(datasetPath, 'CorticalCells_GSM2861514_E175_cleaned.csv', sep='/'), header = TRUE, row.names = 1)
+#matrix <- t(matrix)
+e175 <- CreateSeuratObject(counts = matrix, min.cells = 0, min.features = 0)
+```
+
+```{r, echo=TRUE, eval=TRUE}
+
+bm <- RunAzimuth(query = e175, reference = "mousecortexref")
+
+# Extract prediction scores
+celltype_class <- bm[["prediction.score.class"]]@data
+celltype_cluster <- bm[["prediction.score.cluster"]]@data
+celltype_l3_subclass <- bm[["prediction.score.subclass"]]@data
+celltype_l3_cross_species_cluster <- bm[["prediction.score.cross_species_cluster"]]@data
+
+# I want cell Ids as rows and cluster probabilities as columns
+celltype_class <- t(celltype_class)
+celltype_cluster <- t(celltype_cluster)
+celltype_l3_subclass <- t(celltype_l3_subclass)
+celltype_l3_cross_species_cluster <- t(celltype_l3_cross_species_cluster)
+
+```
+```{r, echo=TRUE, eval=TRUE}
+
+# Create a data frame with cell IDs as the first column and cluster probabilities as subsequent columns
+
+output_df_class <- data.frame(cell = rownames(celltype_class), celltype_class)
+output_df_cluster <- data.frame(cell = rownames(celltype_cluster), celltype_cluster)
+output_df_l3_subclass <- data.frame(cell = rownames(celltype_l3_subclass), celltype_l3_subclass)
+output_df_l3_cross_species_cluster <- data.frame(cell = rownames(celltype_l3_cross_species_cluster), celltype_l3_cross_species_cluster)
+
+
+# Write this data frame to a CSV file
+write.csv(output_df_class, paste('./azimuth_labels/', datasetName, '_class', sep=''), row.names = FALSE)
+write.csv(output_df_cluster, paste('./azimuth_labels/', datasetName, '_cluster', sep=''), row.names = FALSE)
+write.csv(output_df_l3_subclass, paste('./azimuth_labels/', datasetName, '_subclass', sep=''), row.names = FALSE)
+write.csv(output_df_l3_cross_species_cluster, paste('./azimuth_labels/', datasetName, '_cross_species_cluster', sep=''), row.names = FALSE)
+
+```
