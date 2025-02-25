@@ -16,9 +16,9 @@ library(monocle3)
 library(cluster)
 library(COTAN)
 
-tunings = c('default')#, 'antibody', 'celltypist')
+tunings = c('default', 'antibody', 'celltypist')
 tools = c('monocle', 'scanpy', 'seurat', 'scvi-tools', 'COTAN')
-dataset = 'PBMC1'
+dataset = 'PBMC4'
 celltypistPath = paste('./data/', dataset, '/celltypist/Immune_All_Low_probability_matrix.csv', sep='')
 outPath = paste('./data/', dataset, '/probabilistic_score.csv', sep='')
 ```
