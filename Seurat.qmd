@@ -18,7 +18,7 @@ Data loading and preparation
 numTopMarkers = 500
 minClusterSize = 0
 
-datasetName = 'PBMC4' # modify this
+datasetName = 'PBMC1' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
 inDir = paste(datasetPath, '/filtered/10X/', sep='')
 outDir = paste(datasetPath, '/seurat/', sep='')
@@ -108,7 +108,16 @@ write_clustering(outDirDefault, defaultLabelsDf, "cell", "computed_id")
 Differential expression on default clustering results
 
 ```{r}
-pbmc.markers <- FindAllMarkers(pbmc)
+# exclude 20% of cells for each cluster
+testCells <- defaultLabelsDf %>%
+  dplyr::group_by(computed_id) %>%
+  dplyr::sample_frac(0.2) %>%
+  dplyr::pull(cell)
+write.csv(data.frame(cell = testCells), 
+          file = paste(outDirDefault, "test_cells.csv", sep = ""), 
+          row.names = FALSE)
+pbmc_subset <- subset(pbmc, cells = setdiff(Cells(pbmc), testCells))
+pbmc.markers <- FindAllMarkers(pbmc_subset)
 ```
 
 Save markers

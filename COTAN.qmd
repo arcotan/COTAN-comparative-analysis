@@ -18,7 +18,7 @@ defaultGDIThreshold = 1.4
 numTopMarkers = 500
 minClusterSize = 0
 
-datasetName = 'PBMC1' # modify this
+datasetName = 'PBMC3' # modify this
 datasetPath = paste("./data/", datasetName, sep='')
 inDir = paste(datasetPath, '/filtered/', sep='')
 outDir = paste(datasetPath, '/COTAN/', sep='')
@@ -157,9 +157,31 @@ write_clustering(outDirDefault, clustersDf, "cell", "cluster")
 Differential expression
 
 ```{r, echo=TRUE, eval=FALSE}
-coexDF <- DEAOnClusters(PBMC, clusters = mergedClusters)
-PBMC <- addClusterizationCoex(
-  PBMC,
+# exclude 20% of cells for each cluster
+testCells <- clustersDf %>%
+  dplyr::group_by(cluster) %>%
+  dplyr::sample_frac(0.2) %>%
+  dplyr::pull(cell)
+write.csv(data.frame(cell = testCells), 
+          file = paste(outDirDefault, "test_cells.csv", sep = ""), 
+          row.names = FALSE)
+```
+
+```{r, echo=TRUE, eval=FALSE}
+barcodesToDrop = getCells(PBMC)[getCells(PBMC) %in% testCells]
+if (length(barcodesToDrop) != 0) {
+  PBMC_sub <- dropGenesCells(PBMC, cells = barcodesToDrop)
+}
+mergedClusters_sub = getClusterizationData(PBMC_sub, clName = "merged")[[1]]
+PBMC_sub <- proceedToCoex(
+  PBMC_sub,
+  calcCoex = TRUE,
+  cores = numCores,
+  saveObj = FALSE
+)
+coexDF <- DEAOnClusters(PBMC_sub, clusters = mergedClusters_sub)
+PBMC_sub <- addClusterizationCoex(
+  PBMC_sub,
   clName = "merged",
   coexDF = coexDF
 )
@@ -190,7 +212,7 @@ write_cotan_markes = function(outDir, clusters, coex, numTopMarkers, decreasing)
     write.csv(markers, paste(outDir, "markers.csv", sep=''), row.names = FALSE)
 }
 
-numCells <- getNumCells(PBMC)
+numCells <- getNumCells(PBMC_sub)
 pvalsDefault <- pValueFromDEA(coexDF, numCells)
 write_cotan_markes(outDirDefault, mergedClusters, pvalsDefault, numTopMarkers, FALSE)
 ```

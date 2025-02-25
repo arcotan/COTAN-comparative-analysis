@@ -74,10 +74,18 @@ defaultLabelsDf$computed_id <- as.numeric(defaultLabelsDf$computed_id)
 write_clustering(outDirDefault, defaultLabelsDf, "cell", "computed_id")
 ```
 
-
 Differential expression on default clustering results
 
 ```{r}
+# exclude 20% of cells for each cluster
+testCells <- defaultLabelsDf %>%
+  dplyr::group_by(computed_id) %>%
+  dplyr::sample_frac(0.2) %>%
+  dplyr::pull(cell)
+write.csv(data.frame(cell = testCells), 
+          file = paste(outDirDefault, "test_cells.csv", sep = ""), 
+          row.names = FALSE)
+cds <- subset(cds, cells = setdiff(rownames(cds), testCells))
 defaultMarkers <- top_markers(
   cds,
   group_cells_by="cluster",
