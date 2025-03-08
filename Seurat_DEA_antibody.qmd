@@ -1,0 +1,94 @@
+---
+title: Clustering and differential expression analysis using Seurat
+---
+
+```{r}
+library(dplyr)
+library(rjson)
+library(Seurat)
+library(patchwork)
+library(DropletUtils)
+library(rjson)
+source("./utils.R")
+```
+
+Data loading and preparation
+
+```{r}
+datasetName = 'PBMC4' # modify this
+datasetPath = paste("./data/", datasetName, sep='')
+inDir = paste(datasetPath, '/filtered/10X/', sep='')
+outDir = paste(datasetPath, '/seurat/', sep='')
+outDirAntibody = paste(outDir, 'antibody/', sep='')
+```
+
+Dataset loading
+
+```{r}
+pbmc.data <- Read10X(inDir, strip.suffix=TRUE)
+pbmc <- CreateSeuratObject(counts = pbmc.data, min.cells = 0, min.features = 0)
+```
+
+Studying feature variance
+
+```{r}
+plot(log(sort(apply(pbmc.data,1,var), decreasing=TRUE)))
+```
+
+Data normalization
+
+```{r}
+pbmc <- NormalizeData(pbmc, normalization.method = "LogNormalize", scale.factor = 10000)
+```
+
+Feature selection
+
+```{r}
+pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000) # nfeatures chosen based on elbow plot above
+VariableFeaturePlot(pbmc)
+```
+
+Feature scaling
+
+```{r}
+all.genes <- rownames(pbmc)
+pbmc <- ScaleData(pbmc, features = all.genes)
+```
+
+Clustering with default parameters
+
+Plot pca explained variance ratio to choose number of components
+
+```{r}
+pbmc <- RunPCA(pbmc, features = VariableFeatures(object = pbmc))
+ElbowPlot(object = pbmc, ndims = 50)
+```
+
+Differential expression on antibody clustering results
+
+```{r}
+antibody_labels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels_train.csv', sep=''))
+pbmc <- subset(pbmc, cells = antibody_labels$cell)
+identities <- setNames(antibody_labels$cluster.ids, antibody_labels$cell)
+pbmc <- AddMetaData(pbmc, metadata = identities, col.name = "custom_clusters")
+Idents(pbmc) <- pbmc$custom_clusters
+pbmc.markers <- FindAllMarkers(pbmc)
+```
+
+Save markers
+
+```{r}
+# save markers with p-vals
+to_write = pbmc.markers[, c("gene", "cluster", "p_val_adj")]
+colnames(to_write)[colnames(to_write) == "gene"] = "gene"
+colnames(to_write)[colnames(to_write) == "cluster"] = "cluster"
+colnames(to_write)[colnames(to_write) == "p_val_adj"] = "p_val"
+write.csv(to_write, file = paste(outDirAntibody, "markers_pval.csv", sep=""), row.names = FALSE)
+# save markers with standard format
+pbmc.markers$cluster <- as.numeric(pbmc.markers$cluster)
+write_markers(outDirAntibody, pbmc.markers, "gene", "cluster", "p_val_adj", FALSE, numTopMarkers)
+```
+
+```{r}
+sessionInfo()
+```

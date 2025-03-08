@@ -1,0 +1,84 @@
+---
+title: Clustering and differential expression analysis using COTAN
+---
+
+
+```{r, output=FALSE, warning=FALSE}
+library(COTAN)
+library(Seurat)
+library(tibble)
+library(ggplot2)
+library(zeallot)
+library(rjson)
+source("./utils.R")
+options(parallelly.fork.enable = TRUE)
+
+datasetName = 'PBMC4' # modify this
+datasetPath = paste("./data/", datasetName, sep='')
+inDir = paste(datasetPath, '/filtered/', sep='')
+outDir = paste(datasetPath, '/COTAN/', sep='')
+outDirAntibody = paste(outDir, 'antibody/', sep='')
+numTopMarkers = 500
+```
+
+Data loading
+
+```{r}
+PBMC <- readRDS(file = file.path(inDir, paste0(datasetName, ".cotan.RDS")))
+```
+
+Differential expression
+
+```{r, echo=TRUE}
+antibody_labels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels_train.csv', sep=''))
+barcodesToDrop = getCells(PBMC)[!getCells(PBMC) %in% antibody_labels$cell]
+if (length(barcodesToDrop) != 0) {
+  PBMC <- dropGenesCells(PBMC, cells = barcodesToDrop)
+}
+PBMC <- proceedToCoex(
+  PBMC,
+  calcCoex = TRUE,
+  cores = 10,
+  saveObj = FALSE
+)
+antibody_labels <- antibody_labels[antibody_labels$cell %in% getCells(PBMC), ]
+antibody_vector <- setNames(antibody_labels$cluster, antibody_labels$cell)
+coexDF <- DEAOnClusters(PBMC, clusters = antibody_vector)
+```
+
+
+Save markers
+
+```{r, echo=TRUE}
+write_cotan_markes = function(outDir, clusters, coex, numTopMarkers, decreasing) {
+    markers = data.frame()
+    all_genes = data.frame()
+    for (cluster_id in (levels(clusters))) {
+        cluster_markers = data.frame()
+        pv = coex[, cluster_id]
+        names(pv) = rownames(coex)
+        sorted_pv = sort(pv, decreasing = decreasing)
+        cluster_markers = data.frame(gene = names(sorted_pv)[1:numTopMarkers],
+                                    cluster = cluster_id,
+                                    rank = 1:numTopMarkers)
+        markers = rbind(markers, cluster_markers)
+        all_genes = rbind(all_genes, data.frame(
+            gene = names(sorted_pv),
+            cluster = cluster_id,
+            p_val = sorted_pv
+        ))
+    }
+    colnames(markers) = c("gene","cluster","rank")
+    write.csv(markers, paste(outDir, "markers.csv", sep=''), row.names = FALSE)
+    colnames(all_genes) = c("gene", "cluster", "p_val")
+    write.csv(all_genes, paste(outDir, "markers_pval.csv", sep = ''), row.names = FALSE)
+}
+numCells <- getNumCells(PBMC)
+pvals <- pValueFromDEA(coexDF, numCells)
+write_cotan_markes(outDirAntibody, factor(antibody_vector), pvals, numTopMarkers, FALSE)
+```
+
+
+```{r, echo=TRUE, eval=TRUE}
+sessionInfo()
+```

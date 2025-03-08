@@ -1,0 +1,69 @@
+---
+title: Clustering and differential expression analysis using Monocle
+---
+
+```{r}
+library(monocle3)
+library(rjson)
+source("./utils.R")
+```
+
+Data loading and preparation
+
+```{r}
+datasetName = 'PBMC4' # modify this
+datasetPath = paste("./data/", datasetName, sep='')
+inDir = paste(datasetPath, '/filtered/10X/', sep='')
+outDir = paste(datasetPath, '/monocle/', sep='')
+outDirAntibody = paste(outDir, 'antibody/', sep='')
+```
+
+```{r}
+cds <- load_mm_data(
+  mat_path = paste(inDir, "matrix.mtx", sep = "/"), 
+  feature_anno_path = paste(inDir, "genes.tsv", sep = "/"),
+  cell_anno_path = paste(inDir, "barcodes.tsv", sep = "/")
+)
+```
+
+Studying feature variance
+
+```{r}
+cds <- preprocess_cds(cds, num_dim = 10, method = "PCA") # normalization
+plot_pc_variance_explained(cds)
+```
+
+
+Differential expression on antibody clustering results
+
+```{r}
+antibody_labels = read.csv(paste(datasetPath, '/antibody_annotation/antibody_labels_train.csv', sep=''))
+valid_cells <- antibody_labels$cell %in% colnames(cds)
+antibody_labels <- antibody_labels[valid_cells, ]
+cds <- cds[, antibody_labels$cell]
+colData(cds)$custom_clusters <- antibody_labels$cluster.ids
+cds@clusters$UMAP$clusters <- factor(colData(cds)$custom_clusters)
+markers <- top_markers(
+  cds,
+  group_cells_by = "custom_clusters",
+  genes_to_test_per_group = 3000,
+  reduction_method='PCA',
+  cores=10
+)
+```
+
+Save markers
+```{r}
+# save markers with p-vals
+to_write = markers[, c("gene_id", "cell_group", "marker_test_p_value")]
+colnames(to_write)[colnames(to_write) == "gene_id"] = "gene"
+colnames(to_write)[colnames(to_write) == "cell_group"] = "cluster"
+colnames(to_write)[colnames(to_write) == "marker_test_p_value"] = "p_val"
+write.csv(to_write, file = paste(outDirAntibody, "markers_pval.csv", sep=""), row.names = FALSE)
+# save markers with standard format
+write_markers(outDirAntibody, markers, "gene_id", "cell_group", "marker_test_p_value", FALSE, numTopMarkers)
+```
+
+```{r}
+sessionInfo()
+```
